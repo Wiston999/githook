@@ -1,0 +1,11 @@
+---
+  hooks:
+    bitbucket.org:
+      type: bitbucket
+      path: /payload
+      cmd: 'echo {branch}'
+    github.com:
+      type: github
+      path: /github
+      cmd: 'echo {branch}'
+
