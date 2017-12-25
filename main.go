@@ -2,19 +2,19 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
-	// "html"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v2"
 )
 
-var config = flag.String("config", "", "Configuration file")
+var configFile = flag.String("config", "", "Configuration file")
 
 type Response struct {
 	Status int
@@ -33,39 +33,47 @@ type Hook struct {
 	Cmd  string
 }
 
-func main() {
-	flag.Parse()
-	if *config == "" {
-		log.Fatal("Configuration file path is mandatory")
-		panic("Configuration file path is mandatory")
+func parseConfig(configFile string) (config Config, err error) {
+	if configFile == "" {
+		return config, errors.New("Configuration file path is mandatory")
 	}
-	filename, _ := filepath.Abs(*config)
+
+	filename, _ := filepath.Abs(configFile)
 	yamlFile, err := ioutil.ReadFile(filename)
 
 	if err != nil {
-		log.Fatal("Unable to open configuration file: %s", *config)
-		panic(err)
+		return config, err
+	}
+	return parseYAML(yamlFile)
+}
+
+func parseYAML(yamlFile []byte) (config Config, err error) {
+	err = yaml.Unmarshal(yamlFile, &config)
+	if err != nil {
+		return config, err
 	}
 
-	var configuration Config
-	err = yaml.Unmarshal(yamlFile, &configuration)
+	if config.Address == "" {
+		config.Address = "0.0.0.0"
+	}
+	if config.Port == 0 {
+		config.Port = 65000
+	}
+	return config, nil
+}
+
+func main() {
+	flag.Parse()
+
+	config, err := parseConfig(*configFile)
 	if err != nil {
-		log.Fatal("Unable to parse configuration file: %s", *config)
-		panic(err)
+		log.Fatal(err)
 	}
-	log.Printf("Read configuration: %#v", configuration)
-	addr := configuration.Address
-	if addr == "" {
-		addr = "0.0.0.0"
-	}
-	port := configuration.Port
-	if port == 0 {
-		port = 65000
-	}
+
 	http.Handle("/hello", http.HandlerFunc(hello))
 
 	hooksHandled := map[string]int{}
-	for k, v := range configuration.Hooks {
+	for k, v := range config.Hooks {
 		log.Printf("Read hook %s: %#v", k, v)
 		if _, exists := hooksHandled[v.Path]; exists {
 			log.Printf("[WARN] Path %s already defined, ignoring...", v.Path)
@@ -88,8 +96,8 @@ func main() {
 	}
 
 	log.Printf("Added %d hooks", len(hooksHandled))
-	log.Printf("Starting web server at %s:%d\n", addr, port)
-	err = http.ListenAndServe(fmt.Sprintf("%s:%d", addr, port), nil)
+	log.Printf("Starting web server at %s:%d\n", config.Address, config.Port)
+	err = http.ListenAndServe(fmt.Sprintf("%s:%d", config.Address, config.Port), nil)
 	if err != nil {
 		log.Fatal("ListenAndServe:", err)
 	}
