@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -34,11 +33,11 @@ type Hook struct {
 }
 
 func parseConfig(configFile string) (config Config, err error) {
-	if configFile == "" {
-		return config, errors.New("Configuration file path is mandatory")
+	filename, err := filepath.Abs(configFile)
+	if err != nil {
+		return config, err
 	}
 
-	filename, _ := filepath.Abs(configFile)
 	yamlFile, err := ioutil.ReadFile(filename)
 
 	if err != nil {
