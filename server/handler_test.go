@@ -94,7 +94,7 @@ func TestRepoRequestHandler(t *testing.T) {
 	for _, test := range testCases {
 		hook := event.Hook{
 			Type: test,
-			Cmd:  "echo {{branch}}",
+			Cmd:  []string{"echo", "{{branch}}"},
 			Path: "/payloadtest",
 		}
 

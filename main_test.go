@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/wiston999/githook/event"
@@ -32,10 +33,16 @@ func TestParseConfig(t *testing.T) {
 	if len(config.Hooks) != 2 {
 		t.Error("Parsed hooks must be 2")
 	}
-	if config.Hooks["bitbucket.org"].Type != "bitbucket" || config.Hooks["bitbucket.org"].Path != "/payload" || config.Hooks["bitbucket.org"].Cmd != "echo {{branch}}" {
+	condition := config.Hooks["bitbucket.org"].Type != "bitbucket"
+	condition = condition || config.Hooks["bitbucket.org"].Path != "/payload"
+	condition = condition || strings.Join(config.Hooks["bitbucket.org"].Cmd, " ") != "echo {{branch}}"
+	if condition {
 		t.Error("Error parsing hook 0")
 	}
-	if config.Hooks["github.com"].Type != "github" || config.Hooks["github.com"].Path != "/github" || config.Hooks["github.com"].Cmd != "echo {{branch}}" {
+	condition = config.Hooks["github.com"].Type != "github"
+	condition = condition || config.Hooks["github.com"].Path != "/github"
+	condition = condition || strings.Join(config.Hooks["github.com"].Cmd, " ") != "echo {{branch}}"
+	if condition {
 		t.Error("Error parsing hook 1")
 	}
 }
@@ -58,11 +65,11 @@ hooks:
   test1:
     type: bitbucket
     path: /test1
-    cmd: 'echo {{branch}}'
+    cmd: [echo, '{{branch}}']
   test2:
     type: github
     path: /test2
-    cmd: 'echo {{branch}}'`))
+    cmd: [echo, '{{branch}}']`))
 
 	if err != nil {
 		t.Error("An error must not be return with proper file")
@@ -76,10 +83,16 @@ hooks:
 	if len(config.Hooks) != 2 {
 		t.Error("Parsed hooks must be 2")
 	}
-	if config.Hooks["test1"].Type != "bitbucket" || config.Hooks["test1"].Path != "/test1" || config.Hooks["test1"].Cmd != "echo {{branch}}" {
+	condition := config.Hooks["test1"].Type != "bitbucket"
+	condition = condition || config.Hooks["test1"].Path != "/test1"
+	condition = condition || strings.Join(config.Hooks["test1"].Cmd, " ") != "echo {{branch}}"
+	if condition {
 		t.Error("Error parsing hook 0")
 	}
-	if config.Hooks["test2"].Type != "github" || config.Hooks["test2"].Path != "/test2" || config.Hooks["test2"].Cmd != "echo {{branch}}" {
+	condition = config.Hooks["test2"].Type != "github"
+	condition = condition || config.Hooks["test2"].Path != "/test2"
+	condition = condition || strings.Join(config.Hooks["test2"].Cmd, " ") != "echo {{branch}}"
+	if condition {
 		t.Error("Error parsing hook 1")
 	}
 }
@@ -88,15 +101,15 @@ func TestAddHandlers(t *testing.T) {
 	h := http.NewServeMux()
 
 	hooks := make(map[string]event.Hook)
-	hooks["test1"] = event.Hook{Type: "github", Path: "/github1", Cmd: "true"}
-	hooks["test2"] = event.Hook{Type: "github", Path: "/github2", Cmd: "true"}
-	hooks["test3"] = event.Hook{Type: "github", Path: "/github2", Cmd: "true"}
-	hooks["test4"] = event.Hook{Type: "bitbucket", Path: "/bitbucket1", Cmd: "true"}
-	hooks["test5"] = event.Hook{Type: "gitlab", Path: "/gitlab1", Cmd: "true"}
-	hooks["test6"] = event.Hook{Type: "gitlab", Path: "invalid", Cmd: "true"}
-	hooks["test7"] = event.Hook{Type: "gitlab", Path: "/hello", Cmd: "true"}
-	hooks["test8"] = event.Hook{Type: "invalid", Path: "/invalid1", Cmd: "true"}
-	hooks["test9"] = event.Hook{Type: "invalid", Path: "/invalid2", Cmd: ""}
+	hooks["test1"] = event.Hook{Type: "github", Path: "/github1", Cmd: []string{"true"}}
+	hooks["test2"] = event.Hook{Type: "github", Path: "/github2", Cmd: []string{"true"}}
+	hooks["test3"] = event.Hook{Type: "github", Path: "/github2", Cmd: []string{"true"}}
+	hooks["test4"] = event.Hook{Type: "bitbucket", Path: "/bitbucket1", Cmd: []string{"true"}}
+	hooks["test5"] = event.Hook{Type: "gitlab", Path: "/gitlab1", Cmd: []string{"true"}}
+	hooks["test6"] = event.Hook{Type: "gitlab", Path: "invalid", Cmd: []string{"true"}}
+	hooks["test7"] = event.Hook{Type: "gitlab", Path: "/hello", Cmd: []string{"true"}}
+	hooks["test8"] = event.Hook{Type: "invalid", Path: "/invalid1", Cmd: []string{"true"}}
+	hooks["test9"] = event.Hook{Type: "invalid", Path: "/invalid2", Cmd: []string{""}}
 
 	config := Config{Hooks: hooks}
 	hooksHandled := addHandlers(config, h)
