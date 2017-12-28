@@ -22,7 +22,9 @@ type commitAuthor struct {
 	Username string
 }
 
-type GithubEvent RepoEvent
+type GithubEvent struct {
+	RepoEvent
+}
 
 func NewGithubEvent(request *http.Request) (event *GithubEvent, err error) {
 	var payload []byte
@@ -59,6 +61,6 @@ func NewGithubEvent(request *http.Request) (event *GithubEvent, err error) {
 	if author == "" {
 		err = errors.New("Unable to parse author")
 	}
-	event = &GithubEvent{Author: author, Branch: branch, Commit: commit}
+	event = &GithubEvent{RepoEvent{Author: author, Branch: branch, Commit: commit}}
 	return
 }

@@ -10,6 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/wiston999/githook/event"
+
+	"github.com/nu7hatch/gouuid"
 	"gopkg.in/yaml.v2"
 )
 
@@ -61,6 +64,64 @@ func parseYAML(yamlFile []byte) (config Config, err error) {
 	return config, nil
 }
 
+func logRequest(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestId, _ := uuid.NewV4()
+		log.Printf("[INFO] Received request (%s) '%s' %s", requestId, r.URL.Path, r.Method)
+		defer log.Printf("[INFO] Request (%s) completed", requestId)
+
+		h.ServeHTTP(w, r)
+	})
+}
+
+func repoRequest(h http.HandlerFunc, hookName string, hookInfo Hook) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var repoEvent *event.RepoEvent
+		var response Response
+		var err error
+
+		switch hookInfo.Type {
+		case "bitbucket":
+			localEvent, localErr := event.NewBitbucketEvent(r)
+			if localErr != nil {
+				repoEvent, err = nil, localErr
+			} else {
+				repoEvent, err = &localEvent.RepoEvent, localErr
+			}
+		case "github":
+			localEvent, localErr := event.NewGithubEvent(r)
+			if localErr != nil {
+				repoEvent, err = nil, localErr
+			} else {
+				repoEvent, err = &localEvent.RepoEvent, localErr
+			}
+		}
+
+		if err != nil {
+			response.Status, response.Msg = 500, fmt.Sprintf("Error while parsing event: %s", err)
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		if repoEvent.Branch == "" {
+			response.Status, response.Msg = 500, "Repository type is unknown"
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		log.Printf("[DEBUG] Repository event parsed: %#v", repoEvent)
+	}
+}
+
+func hello(w http.ResponseWriter, req *http.Request) {
+	response := Response{Status: 200, Msg: "Hello from githook listener"}
+	json.NewEncoder(w).Encode(response)
+}
+
+func payload(w http.ResponseWriter, req *http.Request) {
+	log.Printf("Received request: %q", req.URL.Path)
+}
+
 func main() {
 	flag.Parse()
 
@@ -69,7 +130,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	http.Handle("/hello", http.HandlerFunc(hello))
+	h := http.NewServeMux()
+
+	h.HandleFunc("/hello", logRequest(hello))
 
 	hooksHandled := map[string]int{}
 	for k, v := range config.Hooks {
@@ -92,22 +155,13 @@ func main() {
 		}
 
 		hooksHandled[v.Path] = 1
+		h.HandleFunc(v.Path, logRequest(repoRequest(payload, k, v)))
 	}
 
 	log.Printf("Added %d hooks", len(hooksHandled))
 	log.Printf("Starting web server at %s:%d\n", config.Address, config.Port)
-	err = http.ListenAndServe(fmt.Sprintf("%s:%d", config.Address, config.Port), nil)
+	err = http.ListenAndServe(fmt.Sprintf("%s:%d", config.Address, config.Port), h)
 	if err != nil {
 		log.Fatal("ListenAndServe:", err)
 	}
-}
-
-func hello(w http.ResponseWriter, req *http.Request) {
-	log.Printf("Received request: %q", req.URL.Path)
-	response := Response{Status: 200, Msg: "Hello from githook listener"}
-	json.NewEncoder(w).Encode(response)
-}
-
-func payload(w http.ResponseWriter, req *http.Request) {
-	log.Printf("Received request: %q", req.URL.Path)
 }

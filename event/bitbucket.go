@@ -39,7 +39,9 @@ type actor struct {
 	Username string
 }
 
-type BitbucketEvent RepoEvent
+type BitbucketEvent struct {
+	RepoEvent
+}
 
 func NewBitbucketEvent(request *http.Request) (event *BitbucketEvent, err error) {
 	var payload []byte
@@ -69,6 +71,6 @@ func NewBitbucketEvent(request *http.Request) (event *BitbucketEvent, err error)
 	if author == "" {
 		err = errors.New("Unable to parse author")
 	}
-	event = &BitbucketEvent{Author: author, Branch: branch, Commit: commit}
+	event = &BitbucketEvent{RepoEvent{Author: author, Branch: branch, Commit: commit}}
 	return
 }

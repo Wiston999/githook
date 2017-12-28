@@ -40,6 +40,14 @@ func TestBitbucketEventKO(t *testing.T) {
 		t.Error("NewBitbucketEvent should fail with payload = \"\"")
 	}
 
+	request = httptest.NewRequest("GET", "/test", strings.NewReader(""))
+	request.Header.Set("Content-Type", "application/json")
+
+	_, err = NewBitbucketEvent(request)
+	if err == nil {
+		t.Error("NewBitbucketEvent should fail with payload = \"\"")
+	}
+
 	request = httptest.NewRequest("POST", "/test", strings.NewReader("{}"))
 	request.Header.Set("Content-Type", "application/json")
 
@@ -51,7 +59,7 @@ func TestBitbucketEventKO(t *testing.T) {
 	request = httptest.NewRequest("GET", "/test", strings.NewReader("{}"))
 	request.Header.Set("Content-Type", "application/json")
 
-	_, err = NewGithubEvent(request)
+	_, err = NewBitbucketEvent(request)
 	if err == nil {
 		t.Error("NewBitbucketEvent should fail request method != POST")
 	}
