@@ -1,7 +1,10 @@
 package main
 
 import (
+	"net/http"
 	"testing"
+
+	"github.com/wiston999/githook/event"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -79,4 +82,27 @@ hooks:
 	if config.Hooks["test2"].Type != "github" || config.Hooks["test2"].Path != "/test2" || config.Hooks["test2"].Cmd != "echo {{branch}}" {
 		t.Error("Error parsing hook 1")
 	}
+}
+
+func TestAddHandlers(t *testing.T) {
+	h := http.NewServeMux()
+
+	hooks := make(map[string]event.Hook)
+	hooks["test1"] = event.Hook{Type: "github", Path: "/github1", Cmd: "true"}
+	hooks["test2"] = event.Hook{Type: "github", Path: "/github2", Cmd: "true"}
+	hooks["test3"] = event.Hook{Type: "github", Path: "/github2", Cmd: "true"}
+	hooks["test4"] = event.Hook{Type: "bitbucket", Path: "/bitbucket1", Cmd: "true"}
+	hooks["test5"] = event.Hook{Type: "gitlab", Path: "/gitlab1", Cmd: "true"}
+	hooks["test6"] = event.Hook{Type: "gitlab", Path: "invalid", Cmd: "true"}
+	hooks["test7"] = event.Hook{Type: "gitlab", Path: "/hello", Cmd: "true"}
+	hooks["test8"] = event.Hook{Type: "invalid", Path: "/invalid1", Cmd: "true"}
+	hooks["test9"] = event.Hook{Type: "invalid", Path: "/invalid2", Cmd: ""}
+
+	config := Config{Hooks: hooks}
+	hooksHandled := addHandlers(config, h)
+
+	if len(hooksHandled) != 4 {
+		t.Errorf("Only 4 hooks should have been added, got %d", len(hooksHandled))
+	}
+
 }

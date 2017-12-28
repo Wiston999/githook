@@ -1,7 +1,6 @@
 package event
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http/httptest"
 	"strings"
@@ -14,7 +13,6 @@ func TestBitbucketEventOK(t *testing.T) {
 	request.Header.Set("Content-Type", "application/json")
 
 	event, err := NewBitbucketEvent(request)
-	fmt.Println(err)
 	if err != nil {
 		t.Error("NewBitbucketEvent should not return err != nil")
 	}
@@ -32,10 +30,26 @@ func TestBitbucketEventOK(t *testing.T) {
 }
 
 func TestBitbucketEventKO(t *testing.T) {
-	request := httptest.NewRequest("POST", "/test", strings.NewReader(""))
+	request := httptest.NewRequest("POST", "/test", nil)
 	request.Header.Set("Content-Type", "application/json")
 
 	_, err := NewBitbucketEvent(request)
+	if err == nil {
+		t.Error("NewBitbucketEvent should fail with payload = nil")
+	}
+
+	request = httptest.NewRequest("GET", "/test", nil)
+	request.Header.Set("Content-Type", "application/json")
+
+	_, err = NewBitbucketEvent(request)
+	if err == nil {
+		t.Error("NewBitbucketEvent should fail with payload = nil")
+	}
+
+	request = httptest.NewRequest("POST", "/test", strings.NewReader(""))
+	request.Header.Set("Content-Type", "application/json")
+
+	_, err = NewBitbucketEvent(request)
 	if err == nil {
 		t.Error("NewBitbucketEvent should fail with payload = \"\"")
 	}

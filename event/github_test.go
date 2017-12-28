@@ -52,10 +52,26 @@ func TestGithubEventOK(t *testing.T) {
 }
 
 func TestGithubEventKO(t *testing.T) {
-	request := httptest.NewRequest("POST", "/test", strings.NewReader(""))
+	request := httptest.NewRequest("POST", "/test", nil)
 	request.Header.Set("Content-Type", "application/json")
 
 	_, err := NewGithubEvent(request)
+	if err == nil {
+		t.Error("NewGithubEvent should fail with payload = nil")
+	}
+
+	request = httptest.NewRequest("GET", "/test", nil)
+	request.Header.Set("Content-Type", "application/json")
+
+	_, err = NewGithubEvent(request)
+	if err == nil {
+		t.Error("NewGithubEvent should fail with payload = nil")
+	}
+
+	request = httptest.NewRequest("POST", "/test", strings.NewReader(""))
+	request.Header.Set("Content-Type", "application/json")
+
+	_, err = NewGithubEvent(request)
 	if err == nil {
 		t.Error("NewGithubEvent should fail with payload = \"\"")
 	}
