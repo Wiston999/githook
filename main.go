@@ -86,14 +86,14 @@ func repoRequest(h http.HandlerFunc, hookName string, hookInfo Hook) func(http.R
 			if localErr != nil {
 				repoEvent, err = nil, localErr
 			} else {
-				repoEvent, err = &localEvent.RepoEvent, localErr
+				repoEvent, err = localEvent, localErr
 			}
 		case "github":
 			localEvent, localErr := event.NewGithubEvent(r)
 			if localErr != nil {
 				repoEvent, err = nil, localErr
 			} else {
-				repoEvent, err = &localEvent.RepoEvent, localErr
+				repoEvent, err = localEvent, localErr
 			}
 		}
 
