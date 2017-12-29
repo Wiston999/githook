@@ -35,12 +35,14 @@ func TestParseConfig(t *testing.T) {
 	}
 	condition := config.Hooks["bitbucket.org"].Type != "bitbucket"
 	condition = condition || config.Hooks["bitbucket.org"].Path != "/payload"
+	condition = condition || config.Hooks["bitbucket.org"].Timeout != 600
 	condition = condition || strings.Join(config.Hooks["bitbucket.org"].Cmd, " ") != "echo {{.Branch}}"
 	if condition {
 		t.Error("Error parsing hook 0")
 	}
 	condition = config.Hooks["github.com"].Type != "github"
 	condition = condition || config.Hooks["github.com"].Path != "/github"
+	condition = condition || config.Hooks["github.com"].Timeout != 0
 	condition = condition || strings.Join(config.Hooks["github.com"].Cmd, " ") != "echo {{.Branch}}"
 	if condition {
 		t.Error("Error parsing hook 1")
@@ -66,9 +68,11 @@ hooks:
     type: bitbucket
     path: /test1
     cmd: [echo, '{{.Branch}}']
+    timeout: 1
   test2:
     type: github
     path: /test2
+    timeout: 2
     cmd: [echo, '{{.Branch}}']`))
 
 	if err != nil {
@@ -85,12 +89,14 @@ hooks:
 	}
 	condition := config.Hooks["test1"].Type != "bitbucket"
 	condition = condition || config.Hooks["test1"].Path != "/test1"
+	condition = condition || config.Hooks["test1"].Timeout != 1
 	condition = condition || strings.Join(config.Hooks["test1"].Cmd, " ") != "echo {{.Branch}}"
 	if condition {
 		t.Error("Error parsing hook 0")
 	}
 	condition = config.Hooks["test2"].Type != "github"
 	condition = condition || config.Hooks["test2"].Path != "/test2"
+	condition = condition || config.Hooks["test2"].Timeout != 2
 	condition = condition || strings.Join(config.Hooks["test2"].Cmd, " ") != "echo {{.Branch}}"
 	if condition {
 		t.Error("Error parsing hook 1")

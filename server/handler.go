@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/wiston999/githook/event"
 
@@ -32,6 +33,8 @@ func RepoRequestHandler(hookName string, hookInfo event.Hook) func(http.Response
 		repoEvent := &event.RepoEvent{}
 		var response Response
 		var err error
+		urlQuery := r.URL.Query()
+		_, sync := urlQuery["sync"]
 
 		switch hookInfo.Type {
 		case "bitbucket":
@@ -43,6 +46,13 @@ func RepoRequestHandler(hookName string, hookInfo event.Hook) func(http.Response
 			}
 		case "github":
 			localEvent, localErr := event.NewGithubEvent(r)
+			if localErr != nil {
+				repoEvent, err = nil, localErr
+			} else {
+				repoEvent, err = localEvent, localErr
+			}
+		case "gitlab":
+			localEvent, localErr := event.NewGitlabEvent(r)
 			if localErr != nil {
 				repoEvent, err = nil, localErr
 			} else {
@@ -65,5 +75,31 @@ func RepoRequestHandler(hookName string, hookInfo event.Hook) func(http.Response
 		}
 
 		log.Printf("[DEBUG] Repository event parsed: %#v", repoEvent)
+		cmd, err := TranslateParams(hookInfo.Cmd, *repoEvent)
+		if err != nil {
+			response.Status, response.Msg = 500, fmt.Sprintf("Unable to translate hook command template (%s): %s", hookName, err)
+			w.WriteHeader(500)
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		channel := make(chan CommandResult)
+		go RunCommand(cmd, hookInfo.Timeout, channel)
+		if sync {
+			result := <-channel
+			response.Status = 200
+			response.Msg = fmt.Sprintf(
+				"Command '%s' sent to execute with result {Err: '%v', stdout: '%s', stderr: '%s'}",
+				strings.Join(cmd, " "),
+				result.Err,
+				result.Stdout,
+				result.Stderr,
+			)
+			json.NewEncoder(w).Encode(response)
+
+		} else {
+			response.Status, response.Msg = 200, fmt.Sprintf("Command '%s' sent to execute", strings.Join(cmd, " "))
+			json.NewEncoder(w).Encode(response)
+		}
 	}
 }

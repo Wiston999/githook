@@ -1,0 +1,11 @@
+---
+  hooks:
+    bitbucket.org:
+      type: bitbucket
+      path: /payload
+      timeout: 10
+      cmd:
+        - echo
+        - 'Branch: {{.Branch}}'
+        - 'Author: {{.Author}}'
+        - 'Commit: {{.Commit}}'

@@ -1,0 +1,16 @@
+---
+  hooks:
+    mkdir:
+      type: bitbucket
+      path: /mkdir
+      timeout: 10
+      cmd:
+        - mkdir
+        - '{{.Branch}}'
+    rmdir:
+      type: bitbucket
+      path: /rmdir
+      timeout: 10
+      cmd:
+        - rmdir
+        - '{{.Branch}}'

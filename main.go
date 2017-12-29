@@ -95,7 +95,7 @@ func main() {
 	h.HandleFunc("/hello", server.JSONRequestMiddleware(server.HelloHandler))
 	hooksHandled := addHandlers(config, h)
 
-	log.Printf("Added %d hooks", len(hooksHandled))
+	log.Printf("Added %d hooks (%v):", len(hooksHandled), hooksHandled)
 	log.Printf("Starting web server at %s:%d\n", config.Address, config.Port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", config.Address, config.Port), h))
 }

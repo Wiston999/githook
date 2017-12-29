@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -89,17 +90,32 @@ func TestJSONRequestMiddleware(t *testing.T) {
 }
 
 func TestRepoRequestHandler(t *testing.T) {
-	testCases := []string{"github", "bitbucket", "unknown-type"}
+	testCases := []struct {
+		Query string
+		Sync  bool
+	}{
+		{"github", false},
+		{"bitbucket", false},
+		{"bitbucket", true},
+		{"unknown-type", false},
+	}
 
-	for _, test := range testCases {
+	for i, test := range testCases {
 		hook := event.Hook{
-			Type: test,
-			Cmd:  []string{"echo", "{{branch}}"},
+			Type: test.Query,
+			Cmd:  []string{"echo", "{{.Branch}}"},
 			Path: "/payloadtest",
 		}
 
 		fmt.Printf("%#v\n", hook)
-		req, err := http.NewRequest("POST", "/payloadtest", strings.NewReader(""))
+		var req *http.Request
+		var err error
+		if test.Sync {
+			payload, _ := ioutil.ReadFile("../payloads/bitbucket.org.json")
+			req, err = http.NewRequest("POST", "/payloadtest?sync", strings.NewReader(string(payload)))
+		} else {
+			req, err = http.NewRequest("POST", "/payloadtest", strings.NewReader(""))
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -109,23 +125,29 @@ func TestRepoRequestHandler(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		if status := rr.Code; status != http.StatusInternalServerError {
-			t.Errorf("handler returned wrong status code: got %v want %v",
-				status, http.StatusInternalServerError)
-		}
-
 		var jsonBody Response
 		err = json.Unmarshal([]byte(rr.Body.String()), &jsonBody)
-		if err != nil {
-			t.Errorf("Unable to decode JSON body into a Response: %s", err)
-		}
+		if test.Sync {
+			if !strings.Contains(jsonBody.Msg, "with result") {
+				t.Errorf("%02d. Msg field in response should contain with result string when sync execution, got %s", i, jsonBody.Msg)
+			}
+		} else {
+			if status := rr.Code; status != http.StatusInternalServerError {
+				t.Errorf("handler returned wrong status code: got %v want %v",
+					status, http.StatusInternalServerError)
+			}
 
-		if jsonBody.Status != 500 {
-			t.Errorf("Status field in response should have 500, got %v", jsonBody.Status)
-		}
+			if err != nil {
+				t.Errorf("%02d. Unable to decode JSON body into a Response: %s", i, err)
+			}
 
-		if jsonBody.Msg == "" {
-			t.Errorf("Msg field in response should not be empty")
+			if jsonBody.Status != 500 {
+				t.Errorf("%02d. Status field in response should have 500, got %v", i, jsonBody.Status)
+			}
+
+			if jsonBody.Msg == "" {
+				t.Errorf("%02d. Msg field in response should not be empty", i)
+			}
 		}
 	}
 }

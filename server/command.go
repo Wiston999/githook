@@ -5,7 +5,9 @@ import (
 	"context"
 	"errors"
 	"io/ioutil"
+	"log"
 	"os/exec"
+	"strings"
 	"text/template"
 	"time"
 
@@ -74,6 +76,7 @@ func RunCommand(cmd []string, timeout int, ch chan CommandResult) {
 		if err := command.Wait(); err != nil {
 			result.Err = err
 		}
+		log.Printf("Command '%s' executed (Err: %v, STDOUT: %s, STDERR: %s)", strings.Join(cmd, " "), result.Err, result.Stdout, result.Stderr)
 		ch <- result
 	}
 }
