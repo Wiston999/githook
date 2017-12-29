@@ -124,7 +124,7 @@ func TestRunCommand(t *testing.T) {
 			true,
 		},
 		{
-			[]string{"logger", "-s", "--no-act", "HELLO FROM LOGGER STDERR"},
+			[]string{"logger", "-s", "HELLO FROM LOGGER STDERR"},
 			10,
 			"",
 			"^.*?HELLO FROM LOGGER STDERR\n$",
