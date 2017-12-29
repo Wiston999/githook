@@ -39,6 +39,9 @@ type actor struct {
 	Username string
 }
 
+// NewBitbucketEvent takes an http.Request object and parses it corresponding
+// to Bitbucket webhook syntax into an RepoEvent object.
+// It returns a RepoEvent object and an error in case of error
 func NewBitbucketEvent(request *http.Request) (event *RepoEvent, err error) {
 	var payload []byte
 	if request.Body != nil {

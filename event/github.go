@@ -22,6 +22,9 @@ type commitAuthor struct {
 	Username string
 }
 
+// NewGithubEvent takes an http.Request object and parses it corresponding
+// to Github webhook syntax into an RepoEvent object.
+// It returns a RepoEvent object and an error in case of error
 func NewGithubEvent(request *http.Request) (event *RepoEvent, err error) {
 	var payload []byte
 	if request.Body == nil {

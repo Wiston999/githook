@@ -18,11 +18,15 @@ import (
 var configFile = flag.String("config", "", "Configuration file")
 
 type Config struct {
+	// Address where the HTTP server will be bind
 	Address string
-	Port    int
-	Hooks   map[string]event.Hook
+	// Port where the HTTP server will be listening
+	Port  int
+	Hooks map[string]event.Hook
 }
 
+// parseConfig parses a YAML configuration file given its filename
+// It returns a Config structure and error in case of errors
 func parseConfig(configFile string) (config Config, err error) {
 	filename, err := filepath.Abs(configFile)
 	if err != nil {
@@ -37,6 +41,8 @@ func parseConfig(configFile string) (config Config, err error) {
 	return parseYAML(yamlFile)
 }
 
+// parseYAML parses a YAML configuration file given its string representation
+// It returns a Config structure and error in case of errors
 func parseYAML(yamlFile []byte) (config Config, err error) {
 	err = yaml.Unmarshal(yamlFile, &config)
 	if err != nil {
@@ -52,6 +58,8 @@ func parseYAML(yamlFile []byte) (config Config, err error) {
 	return config, nil
 }
 
+// addHandlers configures hook handlers into an http.ServeMux handler given a Config structure
+// It returns a map containing the hooks added as key
 func addHandlers(config Config, h *http.ServeMux) (hooksHandled map[string]int) {
 	hooksHandled = make(map[string]int)
 	for k, v := range config.Hooks {
