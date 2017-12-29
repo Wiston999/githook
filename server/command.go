@@ -20,6 +20,12 @@ type CommandResult struct {
 	Stderr []byte
 }
 
+// TranslateParams translates a list of command parameters (from event.Hook) based
+// on the event received at event.RepoEvent. It uses Go's built-in templating (text/template)
+// so all operations on templates can be performed on the command parameters.
+// I.e.: `cmd := ["{{.Branch}}", "is", "the", "branch"]` with event.Branch := "develop" will
+// be transformed to `cmd := ["develop", "is", "the", "branch"]`
+// It returns the translated array of strings and error in case of error
 func TranslateParams(cmd []string, event event.RepoEvent) (trCmd []string, err error) {
 	for _, arg := range cmd {
 		tpl, tmpErr := template.New("cmd-template").Parse(arg)
@@ -39,6 +45,10 @@ func TranslateParams(cmd []string, event event.RepoEvent) (trCmd []string, err e
 	return
 }
 
+// RunCommand executes the hook command on the system, it takes an array of string
+// representing the command to be returned, a timeout in seconds and a channel for returning the data.
+// This function is intended to be run as a goroutine so that's why it returns the result via
+// a channel instead of standard function return
 func RunCommand(cmd []string, timeout int, ch chan CommandResult) {
 	result := CommandResult{}
 	if len(cmd) == 0 {

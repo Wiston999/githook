@@ -12,11 +12,15 @@ import (
 	"github.com/nu7hatch/gouuid"
 )
 
+// HelloHandler implements a basic HTTP Handler that returns a HelloWorld-like response
+// for testing or debugging purposes
 func HelloHandler(w http.ResponseWriter, req *http.Request) {
 	response := Response{Status: 200, Msg: "Hello from githook listener"}
 	json.NewEncoder(w).Encode(response)
 }
 
+// JSONRequestMiddleware implements an http.HandlerFunc middleware that sets
+// the HTTP Content-Type header and prints a log line when the request is received and completed
 func JSONRequestMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestId, _ := uuid.NewV4()
@@ -28,6 +32,9 @@ func JSONRequestMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	})
 }
 
+// RepoRequestHandler setups an http.HandlerFunc using event.Hook information
+// This function makes the hard work of setting up a listener hook on the HTTP Server
+// based on an event.Hook structure
 func RepoRequestHandler(hookName string, hookInfo event.Hook) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		repoEvent := &event.RepoEvent{}
