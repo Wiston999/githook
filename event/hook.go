@@ -1,7 +1,8 @@
 package event
 
 type Hook struct {
-	Type string
-	Path string
-	Cmd  []string
+	Type    string
+	Path    string
+	Timeout int
+	Cmd     []string
 }

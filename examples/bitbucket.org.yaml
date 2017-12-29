@@ -3,13 +3,14 @@
     bitbucket.org:
       type: bitbucket
       path: /payload
+      timeout: 600
       cmd:
         - echo
-        - '{{branch}}'
+        - '{{.Branch}}'
     github.com:
       type: github
       path: /github
       cmd:
         - echo
-        - '{{branch}}'
+        - '{{.Branch}}'
 

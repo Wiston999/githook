@@ -68,6 +68,10 @@ func addHandlers(config Config, h *http.ServeMux) (hooksHandled map[string]int) 
 			log.Printf("[WARN] Path must start with / and be different of /hello")
 			continue
 		}
+		if v.Timeout <= 0 {
+			log.Printf("[WARN] Timeout must be greater than 0, got %v", v.Timeout)
+			continue
+		}
 		if len(v.Cmd) == 0 {
 			log.Printf("[WARN] Cmd must be defined")
 			continue
