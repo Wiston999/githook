@@ -24,6 +24,10 @@ type commitAuthor struct {
 
 func NewGithubEvent(request *http.Request) (event *RepoEvent, err error) {
 	var payload []byte
+	if request.Body == nil {
+		err = errors.New("Unable to parse request.Body == nil")
+		return
+	}
 	switch request.Header.Get("Content-Type") {
 	case "application/json":
 		payload, err = ioutil.ReadAll(request.Body)

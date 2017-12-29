@@ -3,7 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -90,32 +90,47 @@ func TestJSONRequestMiddleware(t *testing.T) {
 }
 
 func TestRepoRequestHandler(t *testing.T) {
+	bbPayload, err := ioutil.ReadFile("../payloads/bitbucket.org.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bbPayloadStr := string(bbPayload)
+
+	ghPayload, err := ioutil.ReadFile("../payloads/github.com.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ghPayloadStr := string(ghPayload)
 	testCases := []struct {
-		Query string
-		Sync  bool
+		Query   string
+		Type    string
+		Payload io.Reader
+		Sync    bool
+		Err     bool
 	}{
-		{"github", false},
-		{"bitbucket", false},
-		{"bitbucket", true},
-		{"unknown-type", false},
+		{"bitbucket", "bitbucket", strings.NewReader(""), false, true},
+		{"bitbucket", "bitbucket", nil, false, true},
+		{"bitbucket", "bitbucket", strings.NewReader(ghPayloadStr), false, true},
+		{"bitbucket", "bitbucket", strings.NewReader(bbPayloadStr), false, false},
+		{"bitbucket?sync", "bitbucket", strings.NewReader(bbPayloadStr), true, false},
+		{"github", "github", strings.NewReader(""), false, true},
+		{"github", "github", nil, false, true},
+		{"github", "github", strings.NewReader(bbPayloadStr), false, true},
+		{"github", "github", strings.NewReader(ghPayloadStr), false, false},
+		{"github?sync", "github", strings.NewReader(ghPayloadStr), true, false},
+		{"unknown-type", "unknown", strings.NewReader(""), false, true},
 	}
 
 	for i, test := range testCases {
 		hook := event.Hook{
-			Type: test.Query,
-			Cmd:  []string{"echo", "{{.Branch}}"},
-			Path: "/payloadtest",
+			Type:    test.Type,
+			Cmd:     []string{"echo", "{{.Branch}}"},
+			Path:    "/payloadtest",
+			Timeout: 10,
 		}
 
-		fmt.Printf("%#v\n", hook)
-		var req *http.Request
-		var err error
-		if test.Sync {
-			payload, _ := ioutil.ReadFile("../payloads/bitbucket.org.json")
-			req, err = http.NewRequest("POST", "/payloadtest?sync", strings.NewReader(string(payload)))
-		} else {
-			req, err = http.NewRequest("POST", "/payloadtest", strings.NewReader(""))
-		}
+		req, err := http.NewRequest("POST", test.Query, test.Payload)
+		req.Header.Set("Content-Type", "application/json")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -127,26 +142,37 @@ func TestRepoRequestHandler(t *testing.T) {
 
 		var jsonBody Response
 		err = json.Unmarshal([]byte(rr.Body.String()), &jsonBody)
+		if err != nil {
+			t.Errorf("%02d. Unable to decode JSON body into a Response: %s", i, err)
+		}
+
 		if test.Sync {
 			if !strings.Contains(jsonBody.Msg, "with result") {
 				t.Errorf("%02d. Msg field in response should contain with result string when sync execution, got %s", i, jsonBody.Msg)
 			}
-		} else {
+		}
+
+		if jsonBody.Msg == "" {
+			t.Errorf("%02d. Msg field in response should not be empty", i)
+		}
+		if test.Err {
 			if status := rr.Code; status != http.StatusInternalServerError {
-				t.Errorf("handler returned wrong status code: got %v want %v",
+				t.Errorf("%02d. Handler returned wrong status code: got %v want %v",
+					i,
 					status, http.StatusInternalServerError)
 			}
-
-			if err != nil {
-				t.Errorf("%02d. Unable to decode JSON body into a Response: %s", i, err)
-			}
-
 			if jsonBody.Status != 500 {
 				t.Errorf("%02d. Status field in response should have 500, got %v", i, jsonBody.Status)
 			}
 
-			if jsonBody.Msg == "" {
-				t.Errorf("%02d. Msg field in response should not be empty", i)
+		} else {
+			if status := rr.Code; status != http.StatusOK {
+				t.Errorf("%02d. Handler returned wrong status code: got %v want %v",
+					i,
+					status, http.StatusOK)
+			}
+			if jsonBody.Status != 200 {
+				t.Errorf("%02d. Status field in response should have 200, got %v", i, jsonBody.Status)
 			}
 		}
 	}

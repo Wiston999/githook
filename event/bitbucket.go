@@ -41,11 +41,17 @@ type actor struct {
 
 func NewBitbucketEvent(request *http.Request) (event *RepoEvent, err error) {
 	var payload []byte
-	payload, err = ioutil.ReadAll(request.Body)
+	if request.Body != nil {
+		payload, err = ioutil.ReadAll(request.Body)
 
-	if err != nil {
+		if err != nil {
+			return
+		}
+	} else {
+		err = errors.New("Unable to parse request.Body == nil")
 		return
 	}
+
 	var parsedPayload bitbucketPayloadType
 	var branch, author, commit string
 	json.Unmarshal(payload, &parsedPayload)
