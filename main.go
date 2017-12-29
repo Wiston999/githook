@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/wiston999/githook/event"
-	"github.com/wiston999/githook/server"
+	"github.com/Wiston999/githook/event"
+	"github.com/Wiston999/githook/server"
 
 	"gopkg.in/yaml.v2"
 )

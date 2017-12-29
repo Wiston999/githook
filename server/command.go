@@ -11,7 +11,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/wiston999/githook/event"
+	"github.com/Wiston999/githook/event"
 )
 
 type CommandResult struct {

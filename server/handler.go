@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/wiston999/githook/event"
+	"github.com/Wiston999/githook/event"
 
 	"github.com/nu7hatch/gouuid"
 )
