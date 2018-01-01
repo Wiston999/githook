@@ -8,11 +8,14 @@ jobs:
   include:
     - stage: Linting
       script: go fmt -v ./... && go vet -v ./...
-    - go: 1.7.x
+    - stage: Test
+      go: 1.7.x
       script: "go test -cover -v ./..."
-    - go: 1.8.x
+    - stage: Test
+      go: 1.8.x
       script: "go test -cover -v ./..."
-    - go: 1.9.x
+    - stage: Test
+      go: 1.9.x
       script: "$GOPATH/bin/goveralls -service=travis-ci"
     - stage: GitHub Release
       script: echo "Deploying to GitHub releases ..."
