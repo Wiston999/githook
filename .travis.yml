@@ -21,9 +21,9 @@ jobs:
       go: 1.8.x
     - stage: Test
       go: 1.9.x
+      script: "$GOPATH/bin/goveralls -service=travis-ci"
     - stage: Test
       go: tip
-      script: "$GOPATH/bin/goveralls -service=travis-ci"
     - stage: GitHub Release
       script: echo "Deploying to GitHub releases ..."
       deploy:
