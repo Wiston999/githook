@@ -7,7 +7,7 @@ before_install:
 jobs:
   include:
     - stage: Linting
-      script: go fmt -v ./... && go vet -v ./...
+      script: go vet -v ./...
     - stage: Test
       go: 1.7.x
       script: "go test -cover -v ./..."
