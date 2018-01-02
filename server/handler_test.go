@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wiston999/githook/event"
+	"github.com/Wiston999/githook/event"
 )
 
 func TestHello(t *testing.T) {

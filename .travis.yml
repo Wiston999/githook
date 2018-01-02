@@ -1,0 +1,40 @@
+---
+language: go
+
+before_install:
+  - go get github.com/mattn/goveralls
+  - go get github.com/golang/lint/golint
+  - go get github.com/mitchellh/gox
+  
+jobs:
+  fast_finish: true
+  allow_failures:
+    - stage: Linting
+    - go: tip
+  include:
+    - stage: Linting
+      script: go vet -v ./...
+    - stage: Linting
+      script: golint $(go list ./... | fgrep -v '/vendor/')
+    - stage: Test
+      go: 1.7.x
+    - stage: Test
+      go: 1.8.x
+    - stage: Test
+      go: 1.9.x
+      script: "$GOPATH/bin/goveralls -service=travis-ci"
+    - stage: Test
+      go: tip
+    - stage: GitHub Release
+      script: gox -osarch="linux/386 darwin/386 windows/386 linux/amd64 darwin/amd64 windows/amd64 linux/arm" -output="builds/{{.Dir}}_{{.OS}}_{{.Arch}}"
+      deploy:
+        file_glob: true
+        file: builds/*
+        provider: releases
+        api_key: 
+          secure: kBvGwjkZfrE/AreQrUX1Kow6rfRAyYO3p3bmQm/0EYP6n6nVzdCxHaBC8bwkye54sZJLKgdfKMKel2XR6GPUhCkt39I/ChNYVpiPjX3gahI4ym5phNPlSaRvxOPODnrAnMW9sxpwkXinGJ0LhF00kBGlTKAKf4E63FGcLRnWVagbFyRohtzzyEXZigjfQlzjwKckMYz+0a+KsnCPYISIlicGAChhLwwrjr2gzf8J8pIXaX69IgntI7o4hxdiA6uOXQm/D4Y6QmsAce811XcEPOewF4+FWS2kAVHfd/g/bMciMxlHqaaB11QWH0bcmS04Fbs8uoWjhIlAIza6JzuYsEbfA4FdEfY8fP8a5K85pNnL3cEa8/maIUYWrW6OJsyXVmwxF/tztc/4VIk37jm3znLdEIZDGR8BL18+Ils4yd5nLo04+KGAkE+sR9KuNISSyubPyIKOy2t9Zsk7/qWYc3IcE0d2+FKanO4UkeJngsW1lkxVdl9e48YChLvxQDuWXITq9xjqqhLTFuOh/BmmQolMnQao3yg9ctQQHwCMMVeSkuWeUMskSDf4evRDZ0aVsWyWYM9l5CGb7coOvP8QCxNiLgkTt2pgB2b+uleBqMk2InECB3D9mzMxeMZCLT/cfLg/A6c1viX/87cz31pZduoOx+o0UeG0tbMNClB65Y8=
+        skip_cleanup: true
+        on:
+          tags: true
+
+script: "go test -cover -v ./..."
