@@ -26,7 +26,7 @@ jobs:
     - stage: Test
       go: tip
     - stage: GitHub Release
-      script: gox -output="builds/{{.Dir}}_{{.OS}}_{{.Arch}}"
+      script: gox -os="linux darwin windows" -arch="386 amd64 arm" -output="builds/{{.Dir}}_{{.OS}}_{{.Arch}}"
       deploy:
         file_glob: true
         file: builds/*
