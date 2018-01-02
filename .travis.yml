@@ -4,6 +4,7 @@ language: go
 before_install:
   - go get github.com/mattn/goveralls
   - go get github.com/golang/lint/golint
+  - go get github.com/mitchellh/gox
   
 jobs:
   fast_finish: true
@@ -25,10 +26,10 @@ jobs:
     - stage: Test
       go: tip
     - stage: GitHub Release
-      script: echo "Deploying to GitHub releases ..."
+      script: gox -output="builds/{{.Dir}}_{{.OS}}_{{.Arch}}"
       deploy:
         provider: releases
-        api_key: $GITHUB_OAUTH_TOKEN
+        api_key: 
         skip_cleanup: true
         on:
           tags: true
