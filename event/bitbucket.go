@@ -3,7 +3,6 @@ package event
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"net/http"
 )
 
@@ -43,21 +42,17 @@ type actor struct {
 // to Bitbucket webhook syntax into an RepoEvent object.
 // It returns a RepoEvent object and an error in case of error
 func NewBitbucketEvent(request *http.Request) (event *RepoEvent, err error) {
-	var payload []byte
-	if request.Body != nil {
-		payload, err = ioutil.ReadAll(request.Body)
-
-		if err != nil {
-			return
-		}
-	} else {
+	if request.Body == nil {
 		err = errors.New("Unable to parse request.Body == nil")
 		return
 	}
-
 	var parsedPayload bitbucketPayloadType
 	var branch, author, commit string
-	json.Unmarshal(payload, &parsedPayload)
+	err = json.NewDecoder(request.Body).Decode(&parsedPayload)
+
+	if err != nil {
+		return
+	}
 
 	if len(parsedPayload.Push.Changes) > 0 {
 		branch = parsedPayload.Push.Changes[0].New.Name

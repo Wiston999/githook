@@ -61,7 +61,7 @@ func TestGithubEventKO(t *testing.T) {
 	}
 
 	request = httptest.NewRequest("GET", "/test", nil)
-	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	_, err = NewGithubEvent(request)
 	if err == nil {
@@ -77,7 +77,7 @@ func TestGithubEventKO(t *testing.T) {
 	}
 
 	request = httptest.NewRequest("GET", "/test", strings.NewReader(""))
-	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	_, err = NewGithubEvent(request)
 	if err == nil {

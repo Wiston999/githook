@@ -101,30 +101,45 @@ func TestRepoRequestHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 	ghPayloadStr := string(ghPayload)
+
+	glPayload, err := ioutil.ReadFile("../payloads/gitlab.com.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	glPayloadStr := string(glPayload)
 	testCases := []struct {
 		Query   string
 		Type    string
+		Cmd     []string
 		Payload io.Reader
 		Sync    bool
 		Err     bool
 	}{
-		{"bitbucket", "bitbucket", strings.NewReader(""), false, true},
-		{"bitbucket", "bitbucket", nil, false, true},
-		{"bitbucket", "bitbucket", strings.NewReader(ghPayloadStr), false, true},
-		{"bitbucket", "bitbucket", strings.NewReader(bbPayloadStr), false, false},
-		{"bitbucket?sync", "bitbucket", strings.NewReader(bbPayloadStr), true, false},
-		{"github", "github", strings.NewReader(""), false, true},
-		{"github", "github", nil, false, true},
-		{"github", "github", strings.NewReader(bbPayloadStr), false, true},
-		{"github", "github", strings.NewReader(ghPayloadStr), false, false},
-		{"github?sync", "github", strings.NewReader(ghPayloadStr), true, false},
-		{"unknown-type", "unknown", strings.NewReader(""), false, true},
+		{"bitbucket", "bitbucket", []string{"echo", "{{.Branch}}"}, strings.NewReader(""), false, true},
+		{"bitbucket", "bitbucket", []string{"echo", "{{.Branch}}"}, nil, false, true},
+		{"bitbucket", "bitbucket", []string{"echo", "{{.Branch}}"}, strings.NewReader(ghPayloadStr), false, true},
+		{"bitbucket", "bitbucket", []string{"echo", "{{.Branch}}"}, strings.NewReader(bbPayloadStr), false, false},
+		{"bitbucket?sync", "bitbucket", []string{"echo", "{{.Branch}}"}, strings.NewReader(bbPayloadStr), true, false},
+		{"invalid-cmd", "bitbucket", []string{"echo", "{{.Branch"}, strings.NewReader(bbPayloadStr), false, true},
+		{"github", "github", []string{"echo", "{{.Branch}}"}, strings.NewReader(""), false, true},
+		{"github", "github", []string{"echo", "{{.Branch}}"}, nil, false, true},
+		{"github", "github", []string{"echo", "{{.Branch}}"}, strings.NewReader(bbPayloadStr), false, true},
+		{"github", "github", []string{"echo", "{{.Branch}}"}, strings.NewReader(ghPayloadStr), false, false},
+		{"github?sync", "github", []string{"echo", "{{.Branch}}"}, strings.NewReader(ghPayloadStr), true, false},
+		{"invalid-cmd", "github", []string{"echo", "{{.Branch"}, strings.NewReader(ghPayloadStr), false, true},
+		{"gitlab", "gitlab", []string{"echo", "{{.Branch}}"}, strings.NewReader(""), false, true},
+		{"gitlab", "gitlab", []string{"echo", "{{.Branch}}"}, nil, false, true},
+		{"gitlab", "gitlab", []string{"echo", "{{.Branch}}"}, strings.NewReader(bbPayloadStr), false, true},
+		{"gitlab", "gitlab", []string{"echo", "{{.Branch}}"}, strings.NewReader(glPayloadStr), false, false},
+		{"gitlab?sync", "gitlab", []string{"echo", "{{.Branch}}"}, strings.NewReader(glPayloadStr), true, false},
+		{"invalid-cmd", "gitlab", []string{"echo", "{{.Branch"}, strings.NewReader(glPayloadStr), false, true},
+		{"unknown-type", "unknown", []string{"echo", "{{.Branch}}"}, strings.NewReader(""), false, true},
 	}
 
 	for i, test := range testCases {
 		hook := event.Hook{
 			Type:    test.Type,
-			Cmd:     []string{"echo", "{{.Branch}}"},
+			Cmd:     test.Cmd,
 			Path:    "/payloadtest",
 			Timeout: 10,
 		}
