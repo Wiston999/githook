@@ -151,8 +151,10 @@ func TestRepoRequestHandler(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		cmdLog := NewMemoryCommandLog()
+
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(RepoRequestHandler("test", hook))
+		handler := http.HandlerFunc(RepoRequestHandler(&cmdLog, "test", hook))
 
 		handler.ServeHTTP(rr, req)
 
@@ -170,6 +172,9 @@ func TestRepoRequestHandler(t *testing.T) {
 
 		if jsonBody.Msg == "" {
 			t.Errorf("%02d. Msg field in response should not be empty", i)
+		}
+		if count, _ := cmdLog.Count(); count != 1 {
+			t.Errorf("%02d. Command log should contain 1 element, got %d", i, count)
 		}
 		if test.Err {
 			if status := rr.Code; status != http.StatusInternalServerError {

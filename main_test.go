@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Wiston999/githook/event"
+	"github.com/Wiston999/githook/server"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -119,8 +120,9 @@ func TestAddHandlers(t *testing.T) {
 	hooks["test10"] = event.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{"true"}, Timeout: 0}
 	hooks["test11"] = event.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{"true"}, Timeout: -10}
 
+	cmdLog := server.NewMemoryCommandLog()
 	config := Config{Hooks: hooks}
-	hooksHandled := addHandlers(config, h)
+	hooksHandled := addHandlers(&cmdLog, config, h)
 	removed := map[string]string{
 		"test3":  "Duplicated Path",
 		"test6":  "Invalid path (must start with /)",

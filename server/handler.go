@@ -65,7 +65,7 @@ func CommandLogRESTHandler(cmdLog CommandLog) func(http.ResponseWriter, *http.Re
 // RepoRequestHandler setups an http.HandlerFunc using event.Hook information
 // This function makes the hard work of setting up a listener hook on the HTTP Server
 // based on an event.Hook structure
-func RepoRequestHandler(hookName string, hookInfo event.Hook) func(http.ResponseWriter, *http.Request) {
+func RepoRequestHandler(cmdLog CommandLog, hookName string, hookInfo event.Hook) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		repoEvent := &event.RepoEvent{}
 		var response Response
@@ -124,6 +124,7 @@ func RepoRequestHandler(hookName string, hookInfo event.Hook) func(http.Response
 		go RunCommand(cmd, hookInfo.Timeout, channel)
 		if sync {
 			result := <-channel
+			cmdLog.AppendResult(result)
 			response.Status = 200
 			response.Msg = fmt.Sprintf(
 				"Command '%s' sent to execute with result {Err: '%v', stdout: '%s', stderr: '%s'}",
@@ -135,6 +136,10 @@ func RepoRequestHandler(hookName string, hookInfo event.Hook) func(http.Response
 			json.NewEncoder(w).Encode(response)
 
 		} else {
+			go func() {
+				result := <-channel
+				cmdLog.AppendResult(result)
+			}()
 			response.Status, response.Msg = 200, fmt.Sprintf("Command '%s' sent to execute", strings.Join(cmd, " "))
 			json.NewEncoder(w).Encode(response)
 		}

@@ -60,7 +60,7 @@ func parseYAML(yamlFile []byte) (config Config, err error) {
 
 // addHandlers configures hook handlers into an http.ServeMux handler given a Config structure
 // It returns a map containing the hooks added as key
-func addHandlers(config Config, h *http.ServeMux) (hooksHandled map[string]int) {
+func addHandlers(cmdLog server.CommandLog, config Config, h *http.ServeMux) (hooksHandled map[string]int) {
 	hooksHandled = make(map[string]int)
 	for k, v := range config.Hooks {
 		log.Printf("Read hook %s: %#v", k, v)
@@ -85,7 +85,7 @@ func addHandlers(config Config, h *http.ServeMux) (hooksHandled map[string]int) 
 			continue
 		}
 
-		h.HandleFunc(v.Path, server.JSONRequestMiddleware(server.RepoRequestHandler(k, v)))
+		h.HandleFunc(v.Path, server.JSONRequestMiddleware(server.RepoRequestHandler(cmdLog, k, v)))
 		hooksHandled[v.Path] = 1
 	}
 	return
@@ -100,8 +100,10 @@ func main() {
 	}
 
 	h := http.NewServeMux()
+	commandLog := server.NewMemoryCommandLog()
 	h.HandleFunc("/hello", server.JSONRequestMiddleware(server.HelloHandler))
-	hooksHandled := addHandlers(config, h)
+	h.HandleFunc("/admin/cmdlog", server.JSONRequestMiddleware(server.CommandLogRESTHandler(&commandLog)))
+	hooksHandled := addHandlers(&commandLog, config, h)
 
 	log.Printf("Added %d hooks (%v):", len(hooksHandled), hooksHandled)
 	log.Printf("Starting web server at %s:%d\n", config.Address, config.Port)
