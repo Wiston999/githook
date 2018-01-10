@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -189,6 +190,66 @@ func TestRepoRequestHandler(t *testing.T) {
 			if jsonBody.Status != 200 {
 				t.Errorf("%02d. Status field in response should have 200, got %v", i, jsonBody.Status)
 			}
+		}
+	}
+}
+
+func TestCommandLogRESTHandler(t *testing.T) {
+	logResults := 20
+	testCases := []struct {
+		Query string
+		Count int
+		Err   bool
+	}{
+		{"admin/log?count=10", 10, false},
+		{"admin/log?count=", logResults, false},
+		{"admin/log", logResults, false},
+		{"admin/log?count=1", 1, false},
+		{"admin/log?count=-1", logResults, false},
+	}
+
+	for i, test := range testCases {
+		req, err := http.NewRequest("GET", test.Query, nil)
+		req.Header.Set("Content-Type", "application/json")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cmdLog := NewMemoryCommandLog()
+
+		for i := 0; i < logResults; i = i + 1 {
+			cmdResult := CommandResult{Stdout: []byte(strconv.Itoa(i)), Stderr: []byte(strconv.Itoa(i))}
+			_, err := cmdLog.AppendResult(cmdResult)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		rr := httptest.NewRecorder()
+		handler := http.HandlerFunc(CommandLogRESTHandler(&cmdLog))
+
+		handler.ServeHTTP(rr, req)
+
+		var jsonBody Response
+		err = json.Unmarshal([]byte(rr.Body.String()), &jsonBody)
+		if err != nil {
+			t.Errorf("%02d. Unable to decode JSON body into a Response: %s", i, err)
+		}
+
+		if jsonBody.Msg == "" {
+			t.Errorf("%02d. Msg field in response should not be empty", i)
+		}
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("%02d. Handler returned wrong status code: got %v want %v",
+				i,
+				status, http.StatusOK)
+		}
+		if jsonBody.Status != 200 {
+			t.Errorf("%02d. Status field in response should have 200, got %v", i, jsonBody.Status)
+		}
+		results := jsonBody.Body.([]interface{})
+		if len(results) != test.Count {
+			t.Errorf("%02d. Number of results returned should be %d, got %d", i, len(results), test.Count)
 		}
 	}
 }

@@ -14,16 +14,16 @@ import (
 
 type CommandLog interface {
 	// AppendResult appends a CommandResult to the underlying CommandLog storage
-	AppendResult(result CommandResult) (bool, error)
+	AppendResult(result CommandResult) (success bool, err error)
 	// GetResults returns at most the latest n CommandResult stored in the underlying storage
 	// sorted from latest to older, if n < 0 it returns all the CommandResult stored
-	GetResults(n int) ([]CommandResult, error)
+	GetResults(n int) (results []CommandResult, err error)
 	// RotateResults rotates the older CommandResult stored in the underlying storage so
 	// only n CommandResult are left in the underlying storage, it returns the number rotated results
 	// i.e.: the deleted ones
-	RotateResults(n int) (int, error)
+	RotateResults(n int) (deleted int, err error)
 	// Counts counts the number of CommandResult stored in the underlying storage
-	Count() (int, error)
+	Count() (count int, err error)
 }
 
 type MemoryCommandLog struct {
