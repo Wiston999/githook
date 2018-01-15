@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -21,32 +22,33 @@ type Config struct {
 	// Address where the HTTP server will be bind
 	Address string
 	// Port where the HTTP server will be listening
-	Port  int
-	Hooks map[string]event.Hook
+	Port          int
+	CommandLogDir string `yaml: command_log_dir`
+	Hooks         map[string]event.Hook
 }
 
 // parseConfig parses a YAML configuration file given its filename
 // It returns a Config structure and error in case of errors
-func parseConfig(configFile string) (config Config, err error) {
+func parseConfig(configFile string) (config Config, cmdLog server.CommandLog, err error) {
 	filename, err := filepath.Abs(configFile)
 	if err != nil {
-		return config, err
+		return
 	}
 
 	yamlFile, err := ioutil.ReadFile(filename)
 
 	if err != nil {
-		return config, err
+		return
 	}
 	return parseYAML(yamlFile)
 }
 
 // parseYAML parses a YAML configuration file given its string representation
 // It returns a Config structure and error in case of errors
-func parseYAML(yamlFile []byte) (config Config, err error) {
+func parseYAML(yamlFile []byte) (config Config, cmdLog server.CommandLog, err error) {
 	err = yaml.Unmarshal(yamlFile, &config)
 	if err != nil {
-		return config, err
+		return
 	}
 
 	if config.Address == "" {
@@ -55,7 +57,16 @@ func parseYAML(yamlFile []byte) (config Config, err error) {
 	if config.Port == 0 {
 		config.Port = 65000
 	}
-	return config, nil
+	fileMode, err := os.Stat(config.CommandLogDir)
+	if err != nil {
+		log.Fatalf("Unable to check %s status", config.CommandLogDir)
+	} else if fileMode.IsDir() {
+		cmdLog, err = server.NewDiskCommandLog(config.CommandLogDir)
+	} else {
+		log.Printf("[WARN] command_log_dir setting not found or invalid, using in memory command log")
+		cmdLog, err = server.NewMemoryCommandLog()
+	}
+	return
 }
 
 // addHandlers configures hook handlers into an http.ServeMux handler given a Config structure
@@ -94,15 +105,14 @@ func addHandlers(cmdLog server.CommandLog, config Config, h *http.ServeMux) (hoo
 func main() {
 	flag.Parse()
 
-	config, err := parseConfig(*configFile)
+	config, commandLog, err := parseConfig(*configFile)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	h := http.NewServeMux()
-	commandLog := server.NewMemoryCommandLog()
 	h.HandleFunc("/hello", server.JSONRequestMiddleware(server.HelloHandler))
-	h.HandleFunc("/admin/cmdlog", server.JSONRequestMiddleware(server.CommandLogRESTHandler(&commandLog)))
+	h.HandleFunc("/admin/cmdl", server.JSONRequestMiddleware(server.CommandLogRESTHandler(&commandLog)))
 	hooksHandled := addHandlers(&commandLog, config, h)
 
 	log.Printf("Added %d hooks (%v):", len(hooksHandled), hooksHandled)
