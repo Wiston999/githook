@@ -2,7 +2,7 @@
 > Execute arbitrary shell commands triggered by GIT webhooks
 
 [![Build Status](https://travis-ci.org/Wiston999/githook.svg?branch=master)](https://travis-ci.org/Wiston999/githook?branch=master)
-[![Coverage Status](https://coveralls.io/repos/github/Wiston999/githook/badge.svg?branch=master)](https://coveralls.io/github/Wiston999/githook?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/Wiston999/githook/badge.svg)](https://coveralls.io/github/Wiston999/githook)
 
 
 ## Installation
@@ -27,10 +27,11 @@ Configuration file syntax is as follows:
   address: (bind address for HTTP interface, default 0.0.0.0)
   port: (listening port for HTTP interface, default 65000)
   hooks:
-  - type: {github, bitbucket, gitlab}
-    path: (HTTP path where this hook will be triggered, i.e.: /webhook-payload)
-    timeout: (Timeout in seconds before the command execution is treated as failed, required)
-    cmd: [Array of strings, the command will be executed using https://golang.org/pkg/os/exec/#Command]
+    [hook name]
+      type: {github, bitbucket, gitlab}
+      path: (HTTP path where this hook will be triggered, i.e.: /webhook-payload)
+      timeout: (Timeout in seconds before the command execution is treated as failed, required)
+      cmd: [Array of strings, the command will be executed using https://golang.org/pkg/os/exec/#Command]
 ```
 
 Configuration file example:
@@ -40,19 +41,21 @@ Configuration file example:
   address: 127.0.0.1 # Bind to localhost (using a reverse proxy such as nginx)
   port: 8080
   hooks:
-  - type: github # Webhook received from a GitHub repository
-    path: /github-custom-command
-    timeout: 300 # Wait for 300 seconds
-    cmd: 
-    - bash
-    - /path/to/my/custom/script.sh
-    - '--branch'
-    - '{{.Branch}}'
-    - '--author'
-  - type: bitbucket # Webhook received from a Bitbucket repository
-    path: /bitbucket-mkdir
-    timeout: 30 # Wait for 30 seconds
-    cmd: [mkdir, '-p', '{{.Author}}/{{.Branch}}/{{.Commit}}'] # Create a folder structure based on commit author, branch and hash
+    github_custom_command:
+      type: github # Webhook received from a GitHub repository
+      path: /github-custom-command
+      timeout: 300 # Wait for 300 seconds
+      cmd: 
+      - bash
+      - /path/to/my/custom/script.sh
+      - '--branch'
+      - '{{.Branch}}'
+      - '--author'
+    bitbucket_mkdir:
+      type: bitbucket # Webhook received from a Bitbucket repository
+      path: /bitbucket-mkdir
+      timeout: 30 # Wait for 30 seconds
+      cmd: [mkdir, '-p', '{{.Author}}/{{.Branch}}/{{.Commit}}'] # Create a folder structure based on commit author, branch and hash
 ```
  Configuration file can be placed everywhere and be readable by the githook binary. Commands are executed with the same user and group as the githook binary runs.
 
