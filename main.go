@@ -23,7 +23,7 @@ type Config struct {
 	Address string
 	// Port where the HTTP server will be listening
 	Port          int
-	CommandLogDir string `yaml: command_log_dir`
+	CommandLogDir string `yaml:"command_log_dir"`
 	Hooks         map[string]event.Hook
 }
 
@@ -34,7 +34,6 @@ func parseConfig(configFile string) (config Config, cmdLog server.CommandLog, er
 	if err != nil {
 		return
 	}
-
 	yamlFile, err := ioutil.ReadFile(filename)
 
 	if err != nil {
@@ -57,14 +56,12 @@ func parseYAML(yamlFile []byte) (config Config, cmdLog server.CommandLog, err er
 	if config.Port == 0 {
 		config.Port = 65000
 	}
-	fileMode, err := os.Stat(config.CommandLogDir)
-	if err != nil {
-		log.Fatalf("Unable to check %s status", config.CommandLogDir)
-	} else if fileMode.IsDir() {
-		cmdLog, err = server.NewDiskCommandLog(config.CommandLogDir)
+	fileMode, statErr := os.Stat(config.CommandLogDir)
+	if statErr == nil && fileMode.IsDir() {
+		cmdLog = server.NewDiskCommandLog(config.CommandLogDir)
 	} else {
 		log.Printf("[WARN] command_log_dir setting not found or invalid, using in memory command log")
-		cmdLog, err = server.NewMemoryCommandLog()
+		cmdLog = server.NewMemoryCommandLog()
 	}
 	return
 }
@@ -112,8 +109,8 @@ func main() {
 
 	h := http.NewServeMux()
 	h.HandleFunc("/hello", server.JSONRequestMiddleware(server.HelloHandler))
-	h.HandleFunc("/admin/cmdl", server.JSONRequestMiddleware(server.CommandLogRESTHandler(&commandLog)))
-	hooksHandled := addHandlers(&commandLog, config, h)
+	h.HandleFunc("/admin/cmdlog", server.JSONRequestMiddleware(server.CommandLogRESTHandler(commandLog)))
+	hooksHandled := addHandlers(commandLog, config, h)
 
 	log.Printf("Added %d hooks (%v):", len(hooksHandled), hooksHandled)
 	log.Printf("Starting web server at %s:%d\n", config.Address, config.Port)

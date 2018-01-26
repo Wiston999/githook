@@ -10,20 +10,20 @@ import (
 )
 
 func TestParseConfig(t *testing.T) {
-	_, err := parseConfig("")
+	_, _, err := parseConfig("")
 	if err == nil {
 		t.Error("An error must be returned when configuration file is empty")
 	}
 
-	_, err = parseConfig("../examples/non_existent_file.yaml")
+	_, _, err = parseConfig("../examples/non_existent_file.yaml")
 	if err == nil {
 		t.Error("An error must be returned when configuration file does not exist")
 	}
 
-	config, err := parseConfig("./examples/bitbucket.org.yaml")
+	config, cmdLog, err := parseConfig("./examples/bitbucket.org.yaml")
 
 	if err != nil {
-		t.Error("An error must not be return with proper file")
+		t.Errorf("An error must not be return with proper file: %s", err)
 	}
 	if config.Address != "0.0.0.0" {
 		t.Error("Parsed address must be 0.0.0.0")
@@ -33,6 +33,11 @@ func TestParseConfig(t *testing.T) {
 	}
 	if len(config.Hooks) != 2 {
 		t.Error("Parsed hooks must be 2")
+	}
+	switch cmdLog.(type) {
+	case *server.MemoryCommandLog:
+	default:
+		t.Error("CommandLog type should be MemoryCommandLog when no command log dir is set")
 	}
 	condition := config.Hooks["bitbucket.org"].Type != "bitbucket"
 	condition = condition || config.Hooks["bitbucket.org"].Path != "/payload"
@@ -51,19 +56,20 @@ func TestParseConfig(t *testing.T) {
 }
 
 func TestParseYAML(t *testing.T) {
-	_, err := parseYAML([]byte(`---`))
+	_, _, err := parseYAML([]byte(`---`))
 	if err != nil {
 		t.Error("An error must not be return with empty YAML file")
 	}
 
-	_, err = parseYAML([]byte(`{}[]-:this is an invalid: YAML file`))
+	_, _, err = parseYAML([]byte(`{}[]-:this is an invalid: YAML file`))
 	if err == nil {
 		t.Error("An error must be returned with invalid YAML file")
 	}
 
-	config, err := parseYAML([]byte(`---
+	config, cmdLog, err := parseYAML([]byte(`---
 address: 127.0.0.1
 port: 8080
+command_log_dir: './'
 hooks:
   test1:
     type: bitbucket
@@ -87,6 +93,11 @@ hooks:
 	}
 	if len(config.Hooks) != 2 {
 		t.Error("Parsed hooks must be 2")
+	}
+	switch cmdLog.(type) {
+	case *server.DiskCommandLog:
+	default:
+		t.Error("CommandLog should be DiskCommandLog when command_log_dir is present and exists")
 	}
 	condition := config.Hooks["test1"].Type != "bitbucket"
 	condition = condition || config.Hooks["test1"].Path != "/test1"
@@ -122,7 +133,7 @@ func TestAddHandlers(t *testing.T) {
 
 	cmdLog := server.NewMemoryCommandLog()
 	config := Config{Hooks: hooks}
-	hooksHandled := addHandlers(&cmdLog, config, h)
+	hooksHandled := addHandlers(cmdLog, config, h)
 	removed := map[string]string{
 		"test3":  "Duplicated Path",
 		"test6":  "Invalid path (must start with /)",
