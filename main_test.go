@@ -125,3 +125,24 @@ func TestSetupCommandLog(t *testing.T) {
 		t.Errorf("Command Log type is not the expected, got %#v but expected DiskCommandLog", v)
 	}
 }
+
+func TestSetupWebServer(t *testing.T) {
+	cmdLog := server.NewMemoryCommandLog()
+	hooks := make(map[string]event.Hook)
+	hooks["test1"] = event.Hook{Type: "github", Path: "/github1", Cmd: []string{"true"}, Timeout: 500}
+
+	server, err := setupWebServer("127.0.0.1", 10000, cmdLog, hooks)
+	if err != nil {
+		t.Errorf("setupWebServer should not fail with proper args: %s", err)
+	}
+	if server.Addr != "127.0.0.1:10000" {
+		t.Errorf("Server should have been setup to listen on 127.0.0.1:10000")
+	}
+
+	hooks = make(map[string]event.Hook)
+
+	_, err = setupWebServer("127.0.0.1", 10000, cmdLog, hooks)
+	if err == nil {
+		t.Errorf("setupWebServer should fail with no hooks to serve")
+	}
+}

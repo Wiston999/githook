@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -112,12 +113,29 @@ func setupCommandLog(commandLogDir string) (cmdLog server.CommandLog) {
 	return
 }
 
+func setupWebServer(address string, port int, cmdLog server.CommandLog, hooks map[string]event.Hook) (*http.Server, error) {
+	h := http.NewServeMux()
+	h.HandleFunc("/hello", server.JSONRequestMiddleware(server.HelloHandler))
+	h.HandleFunc("/admin/cmdlog", server.JSONRequestMiddleware(server.CommandLogRESTHandler(cmdLog)))
+	hooksHandled := addHandlers(cmdLog, hooks, h)
+	if len(hooksHandled) == 0 {
+		return nil, errors.New("No hooks will be handled, I'm useless and so I want to die")
+	}
+	log.WithFields(log.Fields{"hooks": hooksHandled}).Info("Added ", len(hooksHandled), " hooks")
+	log.WithFields(log.Fields{"addr": opts.Addr, "port": opts.Port}).Debug("Starting web server")
+
+	listen := fmt.Sprintf("%s:%d", address, port)
+	return &http.Server{Addr: listen, Handler: h}, nil
+}
+
 var opts struct {
 	ConfigFile string `short:"c" long:"config" description:"Configuration file location"`
 	Addr       string `long:"address" default:"0.0.0.0" description:"Server listening(bind) address"`
 	Port       int    `short:"p" long:"port" default:"65000" description:"Server listening port"`
 	LogDir     string `long:"command_log_dir" description:"CommandLogDir to store requests' results leave empty to use in-memory storage"`
 	LogLevel   string `long:"loglvl" default:"warn" value-name:"choices" choice:"err" choice:"warning" choice:"warn" choice:"info" choice:"debug" description:"Log facility level"`
+	TLSCert    string `long:"tlscert" description:"Certificate file for TLS support"`
+	TLSKey     string `long:"tlskey" description:"Key file for TLS support, TLS is tried if both tlscert and tlskey are provided"`
 }
 
 func main() {
@@ -135,16 +153,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	h := http.NewServeMux()
-	h.HandleFunc("/hello", server.JSONRequestMiddleware(server.HelloHandler))
-	h.HandleFunc("/admin/cmdlog", server.JSONRequestMiddleware(server.CommandLogRESTHandler(commandLog)))
-	hooksHandled := addHandlers(commandLog, hooks, h)
-
-	if len(hooksHandled) == 0 {
-		log.Fatal("No hooks will be handled, I'm useless")
+	server, err := setupWebServer(opts.Addr, opts.Port, commandLog, hooks)
+	if err != nil {
+		log.Fatal(err)
 	}
-
-	log.WithFields(log.Fields{"hooks": hooksHandled}).Info("Added ", len(hooksHandled), " hooks")
-	log.WithFields(log.Fields{"addr": opts.Addr, "port": opts.Port}).Debug("Starting web server")
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", opts.Addr, opts.Port), h))
+	log.Fatal(server.ListenAndServe())
 }
