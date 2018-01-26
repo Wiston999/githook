@@ -15,10 +15,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// CommandResult stores the result of a command execution
 type CommandResult struct {
-	Err    error
-	Stdout []byte
-	Stderr []byte
+	Err    error  `json:"err"`
+	Stdout []byte `json:"stdout"`
+	Stderr []byte `json:"stderr"`
 }
 
 // TranslateParams translates a list of command parameters (from event.Hook) based
@@ -56,42 +57,41 @@ func RunCommand(cmd []string, timeout int, ch chan CommandResult) {
 		result.Err = errors.New("Empty command string present")
 		ch <- result
 		return
-	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
-		defer cancel()
-
-		command := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
-		stderr, err := command.StderrPipe()
-		if err != nil {
-			result.Err = err
-			ch <- result
-			return
-		}
-
-		stdout, err := command.StdoutPipe()
-		if err != nil {
-			result.Err = err
-			ch <- result
-			return
-		}
-
-		if err := command.Start(); err != nil {
-			result.Err = err
-			ch <- result
-			return
-		}
-
-		result.Stdout, _ = ioutil.ReadAll(stdout)
-		result.Stderr, _ = ioutil.ReadAll(stderr)
-
-		if err := command.Wait(); err != nil {
-			result.Err = err
-		}
-		log.Debug("Command '", strings.Join(cmd, " "), "' executed (Err: ", result.Err, ", STDOUT: ", result.Stdout, ", STDERR: ", result.Stderr, ")")
-		log.WithFields(log.Fields{
-			"cmd": strings.Join(cmd, " "),
-			"err": result.Err,
-		}).Info("Command finished")
-		ch <- result
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	command := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
+	stderr, err := command.StderrPipe()
+	if err != nil {
+		result.Err = err
+		ch <- result
+		return
+	}
+
+	stdout, err := command.StdoutPipe()
+	if err != nil {
+		result.Err = err
+		ch <- result
+		return
+	}
+
+	if err := command.Start(); err != nil {
+		result.Err = err
+		ch <- result
+		return
+	}
+
+	result.Stdout, _ = ioutil.ReadAll(stdout)
+	result.Stderr, _ = ioutil.ReadAll(stderr)
+
+	if err := command.Wait(); err != nil {
+		result.Err = err
+	}
+	log.Debug("Command '", strings.Join(cmd, " "), "' executed (Err: ", result.Err, ", STDOUT: ", result.Stdout, ", STDERR: ", result.Stderr, ")")
+	log.WithFields(log.Fields{
+		"cmd": strings.Join(cmd, " "),
+		"err": result.Err,
+	}).Info("Command finished")
+	ch <- result
 }

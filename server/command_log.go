@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// CommandLog is the interface that must be implemented by command loggers
 type CommandLog interface {
 	// AppendResult appends a CommandResult to the underlying CommandLog storage
 	AppendResult(result CommandResult) (success bool, err error)
@@ -26,19 +27,23 @@ type CommandLog interface {
 	Count() (count int, err error)
 }
 
+// MemoryCommandLog implements the CommandLog interface storing the results in memory
 type MemoryCommandLog struct {
 	CommandLog []CommandResult
 }
 
+// NewMemoryCommandLog creates and object of type MemoryCommandLog
 func NewMemoryCommandLog() *MemoryCommandLog {
 	return &MemoryCommandLog{}
 }
 
+// AppendResult of MemoryCommandLog
 func (m *MemoryCommandLog) AppendResult(result CommandResult) (success bool, err error) {
 	m.CommandLog = append(m.CommandLog, result)
 	return true, nil
 }
 
+// GetResults of MemoryCommandLog
 func (m *MemoryCommandLog) GetResults(n int) (results []CommandResult, err error) {
 	if n < 0 {
 		results = make([]CommandResult, len(m.CommandLog))
@@ -53,6 +58,7 @@ func (m *MemoryCommandLog) GetResults(n int) (results []CommandResult, err error
 	return
 }
 
+// RotateResults of MemoryCommandLog
 func (m *MemoryCommandLog) RotateResults(n int) (deleted int, err error) {
 	if n < 0 {
 		return n, errors.New("Rotate value must be greater than 0")
@@ -62,18 +68,22 @@ func (m *MemoryCommandLog) RotateResults(n int) (deleted int, err error) {
 	return len(head), nil
 }
 
+// Count of MemoryCommandLog
 func (m *MemoryCommandLog) Count() (count int, err error) {
 	return len(m.CommandLog), nil
 }
 
+// DiskCommandLog implements the CommandLog interface storing the results in disk
 type DiskCommandLog struct {
 	Location string
 }
 
+// NewDiskCommandLog creates and object of type DiskCommandLog
 func NewDiskCommandLog(location string) *DiskCommandLog {
 	return &DiskCommandLog{Location: location}
 }
 
+// AppendResult of DiskCommandLog
 func (d *DiskCommandLog) AppendResult(result CommandResult) (success bool, err error) {
 
 	fileName, err := filepath.Abs(filepath.Join(d.Location, fmt.Sprintf("%d", time.Now().UnixNano())))
@@ -90,6 +100,7 @@ func (d *DiskCommandLog) AppendResult(result CommandResult) (success bool, err e
 	return (err == nil), err
 }
 
+// GetResults of DiskCommandLog
 func (d *DiskCommandLog) GetResults(n int) (results []CommandResult, err error) {
 	files, err := filepath.Glob(filepath.Join(d.Location, "*"))
 	if err != nil {
@@ -127,6 +138,7 @@ func (d *DiskCommandLog) GetResults(n int) (results []CommandResult, err error) 
 	return
 }
 
+// RotateResults of DiskCommandLog
 func (d *DiskCommandLog) RotateResults(n int) (deleted int, err error) {
 	if n < 0 {
 		return n, errors.New("Rotate value must be greater than 0")
@@ -154,11 +166,12 @@ func (d *DiskCommandLog) RotateResults(n int) (deleted int, err error) {
 		if err != nil {
 			return
 		}
-		deleted += 1
+		deleted++
 	}
 	return
 }
 
+// Count of DiskCommandLog
 func (d *DiskCommandLog) Count() (count int, err error) {
 	files, err := filepath.Glob(filepath.Join(d.Location, "*"))
 	if err != nil {

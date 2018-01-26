@@ -17,6 +17,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// Config stores the hooks configuration for the process
 type Config struct {
 	Hooks map[string]event.Hook
 }

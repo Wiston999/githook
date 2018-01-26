@@ -8,9 +8,9 @@ import (
 )
 
 type gitlabPayloadType struct {
-	Ref           string
-	User_username string
-	Checkout_sha  string
+	Ref          string `json:"ref" yaml:"ref"`
+	UserUsername string `json:"user_username" yaml:"user_username"`
+	CheckoutSha  string `json:"checkout_sha" yaml:"checkout_sha"`
 }
 
 // NewGitlabEvent takes an http.Request object and parses it corresponding
@@ -31,8 +31,8 @@ func NewGitlabEvent(request *http.Request) (event *RepoEvent, err error) {
 
 	sl := strings.Split(parsedPayload.Ref, "/")
 	branch = sl[len(sl)-1]
-	commit = parsedPayload.Checkout_sha
-	author = parsedPayload.User_username
+	commit = parsedPayload.CheckoutSha
+	author = parsedPayload.UserUsername
 
 	if branch == "" {
 		err = errors.New("Unable to parse branch")
