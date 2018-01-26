@@ -157,5 +157,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Fatal(server.ListenAndServe())
+	if opts.TLSCert != "" && opts.TLSKey != "" {
+		log.Info("Trying to start web server with TLS")
+		log.Fatal(server.ListenAndServeTLS(opts.TLSCert, opts.TLSKey))
+	} else {
+		log.Fatal(server.ListenAndServe())
+	}
 }
