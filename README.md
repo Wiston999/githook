@@ -15,17 +15,24 @@ Right now, everything is setup using a configuration file instead of command arg
 
 ```sh
 $ githook -h
-Usage of githook:
-  -config string
-    	Configuration file
+Usage:
+  githook [OPTIONS]
+
+Application Options:
+  -c, --config=                                        Configuration file location
+      --address=                                       Server listening(bind) address (default: 0.0.0.0)
+  -p, --port=                                          Server listening port (default: 65000)
+      --command_log_dir=                               CommandLogDir to store requests' results leave empty to use in-memory storage
+      --loglvl=choices[err|warning|warn|info|debug]    Log facility level (default: warn)
+
+Help Options:
+  -h, --help                                           Show this help message
 ```
 
 Configuration file syntax is as follows:
 
 ```yaml
 ---
-  address: (bind address for HTTP interface, default 0.0.0.0)
-  port: (listening port for HTTP interface, default 65000)
   hooks:
     [hook name]
       type: {github, bitbucket, gitlab}
@@ -38,8 +45,6 @@ Configuration file example:
 
 ```yaml
 ---
-  address: 127.0.0.1 # Bind to localhost (using a reverse proxy such as nginx)
-  port: 8080
   hooks:
     github_custom_command:
       type: github # Webhook received from a GitHub repository
@@ -71,7 +76,7 @@ Configuration file example:
 * This decision has some caveats like:
   * Due to previous point, there is no way to redirect `cmd` output.
   * There is no way to build complex commands using shell pipelines.
-  
+
 ## Development setup
 
 If you wish to develop, you will need to have [Go](https://golang.org/) installed and setup in your system. Once Go is setup, clone the forked repository at `$GOPATH/src/github.com/Wiston999/githook`. This will avoid issues with subpackages.
@@ -86,5 +91,9 @@ If you wish to develop, you will need to have [Go](https://golang.org/) installe
 
 ## Release History
 
+* 0.2.0
+  * Add command log (Disk and memory based)
+  * Integrate https://github.com/sirupsen/logrus
+  * Integrate https://github.com/jessevdk/go-flags
 * 0.1.0
   * First release

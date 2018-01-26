@@ -1,5 +1,4 @@
 ---
-  command_log_dir: '/tmp'
   hooks:
     mkdir:
       type: bitbucket
