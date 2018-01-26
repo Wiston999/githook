@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +12,7 @@ import (
 	"github.com/Wiston999/githook/event"
 	"github.com/Wiston999/githook/server"
 
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
@@ -60,7 +60,7 @@ func parseYAML(yamlFile []byte) (config Config, cmdLog server.CommandLog, err er
 	if statErr == nil && fileMode.IsDir() {
 		cmdLog = server.NewDiskCommandLog(config.CommandLogDir)
 	} else {
-		log.Printf("[WARN] command_log_dir setting not found or invalid, using in memory command log")
+		log.Warn("command_log_dir setting not found or invalid, using in memory command log")
 		cmdLog = server.NewMemoryCommandLog()
 	}
 	return
@@ -71,25 +71,25 @@ func parseYAML(yamlFile []byte) (config Config, cmdLog server.CommandLog, err er
 func addHandlers(cmdLog server.CommandLog, config Config, h *http.ServeMux) (hooksHandled map[string]int) {
 	hooksHandled = make(map[string]int)
 	for k, v := range config.Hooks {
-		log.Printf("Read hook %s: %#v", k, v)
+		log.Info("Read hook %s: %#v", k, v)
 		if _, exists := hooksHandled[v.Path]; exists {
-			log.Printf("[WARN] Path %s already defined, ignoring...", v.Path)
+			log.Warn("Path %s already defined, ignoring...", v.Path)
 			continue
 		}
 		if v.Type != "bitbucket" && v.Type != "github" && v.Type != "gitlab" {
-			log.Printf("[WARN] Unknown repository type, it must be one of: bitbucket, github or gitlab")
+			log.Warn("Unknown repository type, it must be one of: bitbucket, github or gitlab")
 			continue
 		}
 		if !strings.HasPrefix(v.Path, "/") || v.Path == "/hello" {
-			log.Printf("[WARN] Path must start with / and be different of /hello")
+			log.Warn("Path must start with / and be different of /hello")
 			continue
 		}
 		if v.Timeout <= 0 {
-			log.Printf("[WARN] Timeout must be greater than 0, got %v", v.Timeout)
+			log.Warn("Timeout must be greater than 0, got %v", v.Timeout)
 			continue
 		}
 		if len(v.Cmd) == 0 {
-			log.Printf("[WARN] Cmd must be defined")
+			log.Warn("Cmd must be defined")
 			continue
 		}
 
@@ -112,7 +112,7 @@ func main() {
 	h.HandleFunc("/admin/cmdlog", server.JSONRequestMiddleware(server.CommandLogRESTHandler(commandLog)))
 	hooksHandled := addHandlers(commandLog, config, h)
 
-	log.Printf("Added %d hooks (%v):", len(hooksHandled), hooksHandled)
-	log.Printf("Starting web server at %s:%d\n", config.Address, config.Port)
+	log.Info("Added %d hooks (%v):", len(hooksHandled), hooksHandled)
+	log.Debug("Starting web server at %s:%d\n", config.Address, config.Port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", config.Address, config.Port), h))
 }
