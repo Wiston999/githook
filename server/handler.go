@@ -17,9 +17,9 @@ import (
 // the HTTP Content-Type header and prints a log line when the request is received and completed
 func JSONRequestMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestId, _ := uuid.NewV4()
-		log.WithFields(log.Fields{"reqId": requestId, "url": r.URL.Path, "method": r.Method}).Info("Received request")
-		defer log.WithFields(log.Fields{"reqId": requestId}).Info("Request completed")
+		requestID, _ := uuid.NewV4()
+		log.WithFields(log.Fields{"reqId": requestID, "url": r.URL.Path, "method": r.Method}).Info("Received request")
+		defer log.WithFields(log.Fields{"reqId": requestID}).Info("Request completed")
 
 		w.Header().Set("Content-Type", "application/json")
 		h.ServeHTTP(w, r)

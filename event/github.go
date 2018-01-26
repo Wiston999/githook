@@ -9,12 +9,12 @@ import (
 )
 
 type githubPayloadType struct {
-	Ref         string
-	Head_commit headCommit
+	Ref        string
+	HeadCommit headCommit `json:"head_commit" yaml:"head_commit"`
 }
 
 type headCommit struct {
-	Id     string
+	ID     string
 	Author commitAuthor
 }
 
@@ -52,8 +52,8 @@ func NewGithubEvent(request *http.Request) (event *RepoEvent, err error) {
 
 	sl := strings.Split(parsedPayload.Ref, "/")
 	branch = sl[len(sl)-1]
-	commit = parsedPayload.Head_commit.Id
-	author = parsedPayload.Head_commit.Author.Username
+	commit = parsedPayload.HeadCommit.ID
+	author = parsedPayload.HeadCommit.Author.Username
 
 	if branch == "" {
 		err = errors.New("Unable to parse branch")
