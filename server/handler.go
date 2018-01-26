@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/Wiston999/githook/event"
 
 	"github.com/nu7hatch/gouuid"
+	log "github.com/sirupsen/logrus"
 )
 
 // JSONRequestMiddleware implements an http.HandlerFunc middleware that sets
@@ -18,8 +18,8 @@ import (
 func JSONRequestMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestId, _ := uuid.NewV4()
-		log.Printf("[INFO] Received request (%s) '%s' %s", requestId, r.URL.Path, r.Method)
-		defer log.Printf("[INFO] Request (%s) completed", requestId)
+		log.WithFields(log.Fields{"reqId": requestId, "url": r.URL.Path, "method": r.Method}).Info("Received request")
+		defer log.WithFields(log.Fields{"reqId": requestId}).Info("Request completed")
 
 		w.Header().Set("Content-Type", "application/json")
 		h.ServeHTTP(w, r)
@@ -111,7 +111,7 @@ func RepoRequestHandler(cmdLog CommandLog, hookName string, hookInfo event.Hook)
 			return
 		}
 
-		log.Printf("[DEBUG] Repository event parsed: %#v", repoEvent)
+		log.Debug("Repository event parsed: %#v", repoEvent)
 		cmd, err := TranslateParams(hookInfo.Cmd, *repoEvent)
 		if err != nil {
 			response.Status, response.Msg = 500, fmt.Sprintf("Unable to translate hook command template (%s): %s", hookName, err)

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/Wiston999/githook/event"
+	log "github.com/sirupsen/logrus"
 )
 
 func TestHello(t *testing.T) {

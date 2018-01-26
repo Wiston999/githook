@@ -71,9 +71,12 @@ func parseYAML(yamlFile []byte) (config Config, cmdLog server.CommandLog, err er
 func addHandlers(cmdLog server.CommandLog, config Config, h *http.ServeMux) (hooksHandled map[string]int) {
 	hooksHandled = make(map[string]int)
 	for k, v := range config.Hooks {
-		log.Info("Read hook %s: %#v", k, v)
+		log.WithFields(log.Fields{
+			"name": k,
+			"hook": v,
+		}).Info("Read hook")
 		if _, exists := hooksHandled[v.Path]; exists {
-			log.Warn("Path %s already defined, ignoring...", v.Path)
+			log.Warn("Path ", v.Path, " already defined, ignoring...")
 			continue
 		}
 		if v.Type != "bitbucket" && v.Type != "github" && v.Type != "gitlab" {
@@ -85,7 +88,7 @@ func addHandlers(cmdLog server.CommandLog, config Config, h *http.ServeMux) (hoo
 			continue
 		}
 		if v.Timeout <= 0 {
-			log.Warn("Timeout must be greater than 0, got %v", v.Timeout)
+			log.Warn("Timeout must be greater than 0, got ", v.Timeout)
 			continue
 		}
 		if len(v.Cmd) == 0 {
@@ -112,7 +115,7 @@ func main() {
 	h.HandleFunc("/admin/cmdlog", server.JSONRequestMiddleware(server.CommandLogRESTHandler(commandLog)))
 	hooksHandled := addHandlers(commandLog, config, h)
 
-	log.Info("Added %d hooks (%v):", len(hooksHandled), hooksHandled)
-	log.Debug("Starting web server at %s:%d\n", config.Address, config.Port)
+	log.WithFields(log.Fields{"hooks": hooksHandled}).Info("Added ", len(hooksHandled), " hooks")
+	log.WithFields(log.Fields{"addr": config.Address, "port": config.Port}).Debug("Starting web server")
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", config.Address, config.Port), h))
 }
