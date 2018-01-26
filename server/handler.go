@@ -3,14 +3,28 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/Wiston999/githook/event"
 
 	"github.com/nu7hatch/gouuid"
+	log "github.com/sirupsen/logrus"
 )
+
+// JSONRequestMiddleware implements an http.HandlerFunc middleware that sets
+// the HTTP Content-Type header and prints a log line when the request is received and completed
+func JSONRequestMiddleware(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestId, _ := uuid.NewV4()
+		log.WithFields(log.Fields{"reqId": requestId, "url": r.URL.Path, "method": r.Method}).Info("Received request")
+		defer log.WithFields(log.Fields{"reqId": requestId}).Info("Request completed")
+
+		w.Header().Set("Content-Type", "application/json")
+		h.ServeHTTP(w, r)
+	})
+}
 
 // HelloHandler implements a basic HTTP Handler that returns a HelloWorld-like response
 // for testing or debugging purposes
@@ -19,23 +33,39 @@ func HelloHandler(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// JSONRequestMiddleware implements an http.HandlerFunc middleware that sets
-// the HTTP Content-Type header and prints a log line when the request is received and completed
-func JSONRequestMiddleware(h http.HandlerFunc) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestId, _ := uuid.NewV4()
-		log.Printf("[INFO] Received request (%s) '%s' %s", requestId, r.URL.Path, r.Method)
-		defer log.Printf("[INFO] Request (%s) completed", requestId)
+// CommandLogRESTHandler Returns the command log via REST request
+func CommandLogRESTHandler(cmdLog CommandLog) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		response := Response{Status: 200, Msg: "success"}
+		urlQuery := r.URL.Query()
+		count := urlQuery.Get("count")
 
-		w.Header().Set("Content-Type", "application/json")
-		h.ServeHTTP(w, r)
-	})
+		var countInt int
+		var err error
+		if count == "" {
+			countInt = -1
+		} else {
+			countInt, err = strconv.Atoi(count)
+		}
+
+		if err != nil {
+			response.Status, response.Msg = 500, fmt.Sprintf("%s", err)
+		}
+
+		results, err := cmdLog.GetResults(countInt)
+		if err != nil {
+			response.Status, response.Msg = 500, fmt.Sprintf("%s", err)
+		} else {
+			response.Body = results
+		}
+		json.NewEncoder(w).Encode(response)
+	}
 }
 
 // RepoRequestHandler setups an http.HandlerFunc using event.Hook information
 // This function makes the hard work of setting up a listener hook on the HTTP Server
 // based on an event.Hook structure
-func RepoRequestHandler(hookName string, hookInfo event.Hook) func(http.ResponseWriter, *http.Request) {
+func RepoRequestHandler(cmdLog CommandLog, hookName string, hookInfo event.Hook) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		repoEvent := &event.RepoEvent{}
 		var response Response
@@ -81,7 +111,7 @@ func RepoRequestHandler(hookName string, hookInfo event.Hook) func(http.Response
 			return
 		}
 
-		log.Printf("[DEBUG] Repository event parsed: %#v", repoEvent)
+		log.Debug("Repository event parsed: ", repoEvent)
 		cmd, err := TranslateParams(hookInfo.Cmd, *repoEvent)
 		if err != nil {
 			response.Status, response.Msg = 500, fmt.Sprintf("Unable to translate hook command template (%s): %s", hookName, err)
@@ -94,6 +124,7 @@ func RepoRequestHandler(hookName string, hookInfo event.Hook) func(http.Response
 		go RunCommand(cmd, hookInfo.Timeout, channel)
 		if sync {
 			result := <-channel
+			cmdLog.AppendResult(result)
 			response.Status = 200
 			response.Msg = fmt.Sprintf(
 				"Command '%s' sent to execute with result {Err: '%v', stdout: '%s', stderr: '%s'}",
@@ -105,6 +136,10 @@ func RepoRequestHandler(hookName string, hookInfo event.Hook) func(http.Response
 			json.NewEncoder(w).Encode(response)
 
 		} else {
+			go func() {
+				result := <-channel
+				cmdLog.AppendResult(result)
+			}()
 			response.Status, response.Msg = 200, fmt.Sprintf("Command '%s' sent to execute", strings.Join(cmd, " "))
 			json.NewEncoder(w).Encode(response)
 		}

@@ -5,13 +5,14 @@ import (
 	"context"
 	"errors"
 	"io/ioutil"
-	"log"
 	"os/exec"
 	"strings"
 	"text/template"
 	"time"
 
 	"github.com/Wiston999/githook/event"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type CommandResult struct {
@@ -86,7 +87,11 @@ func RunCommand(cmd []string, timeout int, ch chan CommandResult) {
 		if err := command.Wait(); err != nil {
 			result.Err = err
 		}
-		log.Printf("Command '%s' executed (Err: %v, STDOUT: %s, STDERR: %s)", strings.Join(cmd, " "), result.Err, result.Stdout, result.Stderr)
+		log.Debug("Command '", strings.Join(cmd, " "), "' executed (Err: ", result.Err, ", STDOUT: ", result.Stdout, ", STDERR: ", result.Stderr, ")")
+		log.WithFields(log.Fields{
+			"cmd": strings.Join(cmd, " "),
+			"err": result.Err,
+		}).Info("Command finished")
 		ch <- result
 	}
 }

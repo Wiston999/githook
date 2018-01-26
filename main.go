@@ -1,109 +1,150 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/Wiston999/githook/event"
 	"github.com/Wiston999/githook/server"
 
+	"github.com/jessevdk/go-flags"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
-var configFile = flag.String("config", "", "Configuration file")
-
 type Config struct {
-	// Address where the HTTP server will be bind
-	Address string
-	// Port where the HTTP server will be listening
-	Port  int
 	Hooks map[string]event.Hook
 }
 
-// parseConfig parses a YAML configuration file given its filename
-// It returns a Config structure and error in case of errors
-func parseConfig(configFile string) (config Config, err error) {
+// parseHooks parses a YAML configuration file given its filename
+// It returns a map of [string]event.Hook structure and error in case of errors
+func parseHooks(configFile string) (hooks map[string]event.Hook, err error) {
 	filename, err := filepath.Abs(configFile)
 	if err != nil {
-		return config, err
+		return
 	}
-
 	yamlFile, err := ioutil.ReadFile(filename)
 
 	if err != nil {
-		return config, err
+		return
 	}
-	return parseYAML(yamlFile)
-}
 
-// parseYAML parses a YAML configuration file given its string representation
-// It returns a Config structure and error in case of errors
-func parseYAML(yamlFile []byte) (config Config, err error) {
+	var config Config
 	err = yaml.Unmarshal(yamlFile, &config)
 	if err != nil {
-		return config, err
+		return
 	}
-
-	if config.Address == "" {
-		config.Address = "0.0.0.0"
-	}
-	if config.Port == 0 {
-		config.Port = 65000
-	}
-	return config, nil
+	hooks = config.Hooks
+	return
 }
 
-// addHandlers configures hook handlers into an http.ServeMux handler given a Config structure
+// addHandlers configures hook handlers into an http.ServeMux handler given a map of hooks
 // It returns a map containing the hooks added as key
-func addHandlers(config Config, h *http.ServeMux) (hooksHandled map[string]int) {
+func addHandlers(cmdLog server.CommandLog, hooks map[string]event.Hook, h *http.ServeMux) (hooksHandled map[string]int) {
 	hooksHandled = make(map[string]int)
-	for k, v := range config.Hooks {
-		log.Printf("Read hook %s: %#v", k, v)
+	for k, v := range hooks {
+		log.WithFields(log.Fields{
+			"name": k,
+			"hook": v,
+		}).Info("Read hook")
 		if _, exists := hooksHandled[v.Path]; exists {
-			log.Printf("[WARN] Path %s already defined, ignoring...", v.Path)
+			log.Warn("Path ", v.Path, " already defined, ignoring...")
 			continue
 		}
 		if v.Type != "bitbucket" && v.Type != "github" && v.Type != "gitlab" {
-			log.Printf("[WARN] Unknown repository type, it must be one of: bitbucket, github or gitlab")
+			log.Warn("Unknown repository type, it must be one of: bitbucket, github or gitlab")
 			continue
 		}
 		if !strings.HasPrefix(v.Path, "/") || v.Path == "/hello" {
-			log.Printf("[WARN] Path must start with / and be different of /hello")
+			log.Warn("Path must start with / and be different of /hello")
 			continue
 		}
 		if v.Timeout <= 0 {
-			log.Printf("[WARN] Timeout must be greater than 0, got %v", v.Timeout)
+			log.Warn("Timeout must be greater than 0, got ", v.Timeout)
 			continue
 		}
 		if len(v.Cmd) == 0 {
-			log.Printf("[WARN] Cmd must be defined")
+			log.Warn("Cmd must be defined")
 			continue
 		}
 
-		h.HandleFunc(v.Path, server.JSONRequestMiddleware(server.RepoRequestHandler(k, v)))
+		h.HandleFunc(v.Path, server.JSONRequestMiddleware(server.RepoRequestHandler(cmdLog, k, v)))
 		hooksHandled[v.Path] = 1
 	}
 	return
 }
 
-func main() {
-	flag.Parse()
+func setupLogLevel(logLevel string) {
+	parsedLogLevel, err := log.ParseLevel(logLevel)
+	if err != nil {
+		log.Warn("Unknown log level ", logLevel, " falling back to debug")
+		parsedLogLevel = log.DebugLevel
+	}
+	log.SetLevel(parsedLogLevel)
+}
 
-	config, err := parseConfig(*configFile)
+func setupCommandLog(commandLogDir string) (cmdLog server.CommandLog) {
+	cmdLog = server.NewMemoryCommandLog()
+	defer func() {
+		switch cmdLog.(type) {
+		case *server.MemoryCommandLog:
+			log.Warn("CommandLogDir setting not found or invalid, using in memory command log")
+		case *server.DiskCommandLog:
+			log.Info("Commands will be logged to", commandLogDir)
+		}
+	}()
+	if commandLogDir == "" {
+		return
+	}
+
+	absLogDir, absErr := filepath.Abs(commandLogDir)
+	if absErr != nil {
+		return
+	}
+	fileMode, statErr := os.Stat(absLogDir)
+	if statErr == nil && fileMode.IsDir() {
+		cmdLog = server.NewDiskCommandLog(commandLogDir)
+	}
+	return
+}
+
+var opts struct {
+	ConfigFile string `short:"c" long:"config" description:"Configuration file location"`
+	Addr       string `long:"address" default:"0.0.0.0" description:"Server listening(bind) address"`
+	Port       int    `short:"p" long:"port" default:"65000" description:"Server listening port"`
+	LogDir     string `long:"command_log_dir" description:"CommandLogDir to store requests' results leave empty to use in-memory storage"`
+	LogLevel   string `long:"loglvl" default:"warn" value-name:"choices" choice:"err" choice:"warning" choice:"warn" choice:"info" choice:"debug" description:"Log facility level"`
+}
+
+func main() {
+	_, err := flags.Parse(&opts)
+
+	if err != nil {
+		os.Exit(1)
+	}
+
+	setupLogLevel(opts.LogLevel)
+	commandLog := setupCommandLog(opts.LogDir)
+	hooks, err := parseHooks(opts.ConfigFile)
+	log.WithFields(log.Fields{"hooks": hooks}).Debug("Hooks parsed from configuration file")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	h := http.NewServeMux()
 	h.HandleFunc("/hello", server.JSONRequestMiddleware(server.HelloHandler))
-	hooksHandled := addHandlers(config, h)
+	h.HandleFunc("/admin/cmdlog", server.JSONRequestMiddleware(server.CommandLogRESTHandler(commandLog)))
+	hooksHandled := addHandlers(commandLog, hooks, h)
 
-	log.Printf("Added %d hooks (%v):", len(hooksHandled), hooksHandled)
-	log.Printf("Starting web server at %s:%d\n", config.Address, config.Port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", config.Address, config.Port), h))
+	if len(hooksHandled) == 0 {
+		log.Fatal("No hooks will be handled, I'm useless")
+	}
+
+	log.WithFields(log.Fields{"hooks": hooksHandled}).Info("Added ", len(hooksHandled), " hooks")
+	log.WithFields(log.Fields{"addr": opts.Addr, "port": opts.Port}).Debug("Starting web server")
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", opts.Addr, opts.Port), h))
 }
