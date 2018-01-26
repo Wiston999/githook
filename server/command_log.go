@@ -30,9 +30,8 @@ type MemoryCommandLog struct {
 	CommandLog []CommandResult
 }
 
-func NewMemoryCommandLog() MemoryCommandLog {
-	cmdLog := MemoryCommandLog{}
-	return cmdLog
+func NewMemoryCommandLog() *MemoryCommandLog {
+	return &MemoryCommandLog{}
 }
 
 func (m *MemoryCommandLog) AppendResult(result CommandResult) (success bool, err error) {
@@ -71,9 +70,8 @@ type DiskCommandLog struct {
 	Location string
 }
 
-func NewDiskCommandLog(location string) DiskCommandLog {
-	cmdLog := DiskCommandLog{Location: location}
-	return cmdLog
+func NewDiskCommandLog(location string) *DiskCommandLog {
+	return &DiskCommandLog{Location: location}
 }
 
 func (d *DiskCommandLog) AppendResult(result CommandResult) (success bool, err error) {

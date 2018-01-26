@@ -154,7 +154,7 @@ func TestRepoRequestHandler(t *testing.T) {
 		cmdLog := NewMemoryCommandLog()
 
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(RepoRequestHandler(&cmdLog, "test", hook))
+		handler := http.HandlerFunc(RepoRequestHandler(cmdLog, "test", hook))
 
 		handler.ServeHTTP(rr, req)
 
@@ -233,7 +233,7 @@ func TestCommandLogRESTHandler(t *testing.T) {
 		}
 
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(CommandLogRESTHandler(&cmdLog))
+		handler := http.HandlerFunc(CommandLogRESTHandler(cmdLog))
 
 		handler.ServeHTTP(rr, req)
 
