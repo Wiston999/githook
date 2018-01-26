@@ -111,7 +111,7 @@ func RepoRequestHandler(cmdLog CommandLog, hookName string, hookInfo event.Hook)
 			return
 		}
 
-		log.Debug("Repository event parsed: %#v", repoEvent)
+		log.Debug("Repository event parsed: ", repoEvent)
 		cmd, err := TranslateParams(hookInfo.Cmd, *repoEvent)
 		if err != nil {
 			response.Status, response.Msg = 500, fmt.Sprintf("Unable to translate hook command template (%s): %s", hookName, err)

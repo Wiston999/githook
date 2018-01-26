@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  name = "github.com/jessevdk/go-flags"
+  packages = ["."]
+  revision = "96dc06278ce32a0e9d957d590bb987c81ee66407"
+  version = "v1.3.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/nu7hatch/gouuid"
   packages = ["."]
@@ -34,6 +40,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "71360a6229a368e67bd76aa8622c8ba9df48ea5962a81dbfb0921c1fd78984ae"
+  inputs-digest = "d51467ec7d061d443c839cc5ad27a4cd8c6fb9f03996c81f4b9dab2003b59dfb"
   solver-name = "gps-cdcl"
   solver-version = 1
