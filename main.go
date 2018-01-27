@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Wiston999/githook/event"
 	"github.com/Wiston999/githook/server"
 
 	"github.com/jessevdk/go-flags"
@@ -19,12 +18,12 @@ import (
 
 // Config stores the hooks configuration for the process
 type Config struct {
-	Hooks map[string]event.Hook
+	Hooks map[string]server.Hook
 }
 
 // parseHooks parses a YAML configuration file given its filename
-// It returns a map of [string]event.Hook structure and error in case of errors
-func parseHooks(configFile string) (hooks map[string]event.Hook, err error) {
+// It returns a map of [string]server.Hook structure and error in case of errors
+func parseHooks(configFile string) (hooks map[string]server.Hook, err error) {
 	filename, err := filepath.Abs(configFile)
 	if err != nil {
 		return
@@ -46,7 +45,7 @@ func parseHooks(configFile string) (hooks map[string]event.Hook, err error) {
 
 // addHandlers configures hook handlers into an http.ServeMux handler given a map of hooks
 // It returns a map containing the hooks added as key
-func addHandlers(cmdLog server.CommandLog, hooks map[string]event.Hook, h *http.ServeMux) (hooksHandled map[string]int) {
+func addHandlers(cmdLog server.CommandLog, hooks map[string]server.Hook, h *http.ServeMux) (hooksHandled map[string]int) {
 	hooksHandled = make(map[string]int)
 	for k, v := range hooks {
 		log.WithFields(log.Fields{
@@ -54,24 +53,28 @@ func addHandlers(cmdLog server.CommandLog, hooks map[string]event.Hook, h *http.
 			"hook": v,
 		}).Info("Read hook")
 		if _, exists := hooksHandled[v.Path]; exists {
-			log.Warn("Path ", v.Path, " already defined, ignoring...")
+			log.WithFields(log.Fields{"hook": k}).Warn("Path ", v.Path, " already defined, ignoring...")
 			continue
 		}
 		if v.Type != "bitbucket" && v.Type != "github" && v.Type != "gitlab" {
-			log.Warn("Unknown repository type, it must be one of: bitbucket, github or gitlab")
+			log.WithFields(log.Fields{"hook": k}).Warn("Unknown repository type, it must be one of: bitbucket, github or gitlab")
 			continue
 		}
 		if !strings.HasPrefix(v.Path, "/") || v.Path == "/hello" {
-			log.Warn("Path must start with / and be different of /hello")
+			log.WithFields(log.Fields{"hook": k}).Warn("Path must start with / and be different of /hello")
 			continue
 		}
 		if v.Timeout <= 0 {
-			log.Warn("Timeout must be greater than 0, got ", v.Timeout)
+			log.WithFields(log.Fields{"hook": k}).Warn("Timeout must be greater than 0, got ", v.Timeout)
 			continue
 		}
 		if len(v.Cmd) == 0 {
-			log.Warn("Cmd must be defined")
+			log.WithFields(log.Fields{"hook": k}).Warn("Cmd must be defined")
 			continue
+		}
+		if v.Concurrency == 0 {
+			log.WithFields(log.Fields{"hook": k}).Warn("Concurrency level of 0 found, falling back to default 1")
+			v.Concurrency = 1
 		}
 
 		h.HandleFunc(v.Path, server.JSONRequestMiddleware(server.RepoRequestHandler(cmdLog, k, v)))
@@ -114,7 +117,7 @@ func setupCommandLog(commandLogDir string) (cmdLog server.CommandLog) {
 	return
 }
 
-func setupWebServer(address string, port int, cmdLog server.CommandLog, hooks map[string]event.Hook) (*http.Server, error) {
+func setupWebServer(address string, port int, cmdLog server.CommandLog, hooks map[string]server.Hook) (*http.Server, error) {
 	h := http.NewServeMux()
 	h.HandleFunc("/hello", server.JSONRequestMiddleware(server.HelloHandler))
 	h.HandleFunc("/admin/cmdlog", server.JSONRequestMiddleware(server.CommandLogRESTHandler(cmdLog)))

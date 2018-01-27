@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Wiston999/githook/event"
 	"github.com/Wiston999/githook/server"
 
 	log "github.com/sirupsen/logrus"
@@ -46,18 +45,18 @@ func TestParseHooks(t *testing.T) {
 func TestAddHandlers(t *testing.T) {
 	h := http.NewServeMux()
 
-	hooks := make(map[string]event.Hook)
-	hooks["test1"] = event.Hook{Type: "github", Path: "/github1", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test2"] = event.Hook{Type: "github", Path: "/github2", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test3"] = event.Hook{Type: "github", Path: "/github2", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test4"] = event.Hook{Type: "bitbucket", Path: "/bitbucket1", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test5"] = event.Hook{Type: "gitlab", Path: "/gitlab1", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test6"] = event.Hook{Type: "gitlab", Path: "invalid", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test7"] = event.Hook{Type: "gitlab", Path: "/hello", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test8"] = event.Hook{Type: "invalid", Path: "/invalid1", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test9"] = event.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{}, Timeout: 500}
-	hooks["test10"] = event.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{"true"}, Timeout: 0}
-	hooks["test11"] = event.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{"true"}, Timeout: -10}
+	hooks := make(map[string]server.Hook)
+	hooks["test1"] = server.Hook{Type: "github", Path: "/github1", Cmd: []string{"true"}, Timeout: 500}
+	hooks["test2"] = server.Hook{Type: "github", Path: "/github2", Cmd: []string{"true"}, Timeout: 500}
+	hooks["test3"] = server.Hook{Type: "github", Path: "/github2", Cmd: []string{"true"}, Timeout: 500}
+	hooks["test4"] = server.Hook{Type: "bitbucket", Path: "/bitbucket1", Cmd: []string{"true"}, Timeout: 500}
+	hooks["test5"] = server.Hook{Type: "gitlab", Path: "/gitlab1", Cmd: []string{"true"}, Timeout: 500}
+	hooks["test6"] = server.Hook{Type: "gitlab", Path: "invalid", Cmd: []string{"true"}, Timeout: 500}
+	hooks["test7"] = server.Hook{Type: "gitlab", Path: "/hello", Cmd: []string{"true"}, Timeout: 500}
+	hooks["test8"] = server.Hook{Type: "invalid", Path: "/invalid1", Cmd: []string{"true"}, Timeout: 500}
+	hooks["test9"] = server.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{}, Timeout: 500}
+	hooks["test10"] = server.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{"true"}, Timeout: 0}
+	hooks["test11"] = server.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{"true"}, Timeout: -10}
 
 	cmdLog := server.NewMemoryCommandLog()
 	hooksHandled := addHandlers(cmdLog, hooks, h)
@@ -128,8 +127,8 @@ func TestSetupCommandLog(t *testing.T) {
 
 func TestSetupWebServer(t *testing.T) {
 	cmdLog := server.NewMemoryCommandLog()
-	hooks := make(map[string]event.Hook)
-	hooks["test1"] = event.Hook{Type: "github", Path: "/github1", Cmd: []string{"true"}, Timeout: 500}
+	hooks := make(map[string]server.Hook)
+	hooks["test1"] = server.Hook{Type: "github", Path: "/github1", Cmd: []string{"true"}, Timeout: 500}
 
 	server, err := setupWebServer("127.0.0.1", 10000, cmdLog, hooks)
 	if err != nil {
@@ -139,7 +138,7 @@ func TestSetupWebServer(t *testing.T) {
 		t.Errorf("Server should have been setup to listen on 127.0.0.1:10000")
 	}
 
-	hooks = make(map[string]event.Hook)
+	hooks = make(map[string]server.Hook)
 
 	_, err = setupWebServer("127.0.0.1", 10000, cmdLog, hooks)
 	if err == nil {

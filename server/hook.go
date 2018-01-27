@@ -1,4 +1,4 @@
-package event
+package server
 
 // Hook structure holds all the information needed to configure an HTTP endpoint
 // and execute the custom command on the system
@@ -16,9 +16,12 @@ package event
 // that don't has the same UNIX shell behaviour.
 // It is also safer as remote data from git webhook provider won't be treated as part of a shell command
 // but will be treated as part of a shell-command parameter
+// Concurrency determines the number of concurrent workers that will be available to run command
+// a concurrency level of 1 means that only 1 command can be executed at a time (mutex mode), default is 1
 type Hook struct {
-	Type    string
-	Path    string
-	Timeout int
-	Cmd     []string
+	Type        string
+	Path        string
+	Timeout     int
+	Cmd         []string
+	Concurrency int
 }

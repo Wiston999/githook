@@ -138,7 +138,7 @@ func TestRepoRequestHandler(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		hook := event.Hook{
+		hook := Hook{
 			Type:    test.Type,
 			Cmd:     test.Cmd,
 			Path:    "/payloadtest",
