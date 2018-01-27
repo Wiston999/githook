@@ -2,7 +2,25 @@
   hooks:
     bitbucket.org:
       type: bitbucket
-      path: /payload
+      path: /bitbucket
+      timeout: 10
+      cmd:
+        - echo
+        - 'Branch: {{.Branch}}'
+        - 'Author: {{.Author}}'
+        - 'Commit: {{.Commit}}'
+    github.com:
+      type: github
+      path: /github
+      timeout: 10
+      cmd:
+        - echo
+        - 'Branch: {{.Branch}}'
+        - 'Author: {{.Author}}'
+        - 'Commit: {{.Commit}}'
+    gitlab.com:
+      type: gitlab
+      path: /gitlab
       timeout: 10
       cmd:
         - echo
