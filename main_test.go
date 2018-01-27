@@ -29,6 +29,7 @@ func TestParseHooks(t *testing.T) {
 	condition := hooks["bitbucket.org"].Type != "bitbucket"
 	condition = condition || hooks["bitbucket.org"].Path != "/payload"
 	condition = condition || hooks["bitbucket.org"].Timeout != 600
+	condition = condition || hooks["bitbucket.org"].Concurrency != 1
 	condition = condition || strings.Join(hooks["bitbucket.org"].Cmd, " ") != "echo {{.Branch}}"
 	if condition {
 		t.Error("Error parsing hook 0")
@@ -36,6 +37,7 @@ func TestParseHooks(t *testing.T) {
 	condition = hooks["github.com"].Type != "github"
 	condition = condition || hooks["github.com"].Path != "/github"
 	condition = condition || hooks["github.com"].Timeout != 0
+	condition = condition || hooks["github.com"].Concurrency != 0
 	condition = condition || strings.Join(hooks["github.com"].Cmd, " ") != "echo {{.Branch}}"
 	if condition {
 		t.Error("Error parsing hook 1")
@@ -57,6 +59,7 @@ func TestAddHandlers(t *testing.T) {
 	hooks["test9"] = server.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{}, Timeout: 500}
 	hooks["test10"] = server.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{"true"}, Timeout: 0}
 	hooks["test11"] = server.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{"true"}, Timeout: -10}
+	hooks["test12"] = server.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{"true"}, Timeout: 10, Concurrency: -10}
 
 	cmdLog := server.NewMemoryCommandLog()
 	hooksHandled := addHandlers(cmdLog, hooks, h)
@@ -68,6 +71,7 @@ func TestAddHandlers(t *testing.T) {
 		"test9":  "Invalid Cmd (must be present)",
 		"test10": "Timeout must be greater than 0",
 		"test11": "Timeout must be greater than 0",
+		"test12": "Concurrency must be greater than 0",
 	}
 
 	if len(hooksHandled) != (len(hooks) - len(removed)) {
@@ -130,11 +134,11 @@ func TestSetupWebServer(t *testing.T) {
 	hooks := make(map[string]server.Hook)
 	hooks["test1"] = server.Hook{Type: "github", Path: "/github1", Cmd: []string{"true"}, Timeout: 500}
 
-	server, err := setupWebServer("127.0.0.1", 10000, cmdLog, hooks)
+	webServer, err := setupWebServer("127.0.0.1", 10000, cmdLog, hooks)
 	if err != nil {
 		t.Errorf("setupWebServer should not fail with proper args: %s", err)
 	}
-	if server.Addr != "127.0.0.1:10000" {
+	if webServer.Addr != "127.0.0.1:10000" {
 		t.Errorf("Server should have been setup to listen on 127.0.0.1:10000")
 	}
 

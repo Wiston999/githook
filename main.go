@@ -72,7 +72,10 @@ func addHandlers(cmdLog server.CommandLog, hooks map[string]server.Hook, h *http
 			log.WithFields(log.Fields{"hook": k}).Warn("Cmd must be defined")
 			continue
 		}
-		if v.Concurrency == 0 {
+		if v.Concurrency < 0 {
+			log.WithFields(log.Fields{"hook": k}).Warn("Concurrency level must be a value greater than 0")
+			continue
+		} else if v.Concurrency == 0 {
 			log.WithFields(log.Fields{"hook": k}).Warn("Concurrency level of 0 found, falling back to default 1")
 			v.Concurrency = 1
 		}

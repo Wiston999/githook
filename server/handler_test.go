@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -12,7 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Wiston999/githook/event"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -156,7 +156,8 @@ func TestRepoRequestHandler(t *testing.T) {
 		rr := httptest.NewRecorder()
 		handler := http.HandlerFunc(RepoRequestHandler(cmdLog, "test", hook))
 
-		handler.ServeHTTP(rr, req)
+		ctx := context.WithValue(req.Context(), "requestID", "my-request-id")
+		handler.ServeHTTP(rr, req.WithContext(ctx))
 
 		var jsonBody Response
 		err = json.Unmarshal([]byte(rr.Body.String()), &jsonBody)

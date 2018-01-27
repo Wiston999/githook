@@ -133,14 +133,11 @@ func TestRunCommand(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		ch := make(chan CommandResult)
-		go RunCommand(test.cmd, test.timeout, ch)
-		got := <-ch
+		got := RunCommand(test.cmd, test.timeout)
 
 		if got.Err != nil && !test.expectedErr {
 			t.Errorf("%02d. RunCommand should not throw error with %v but got %s", i, test.cmd, got.Err)
 		}
-
 		if match, _ := regexp.Match(test.expectedStdout, got.Stdout); !match {
 			t.Errorf("%02d. RunCommand STDOUT does not match, expected %v but got %s", i, test.expectedStdout, got.Stdout)
 		}
