@@ -1,11 +1,8 @@
 package main
 
 import (
-	"net/http"
 	"strings"
 	"testing"
-
-	"github.com/Wiston999/githook/server"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -44,47 +41,6 @@ func TestParseHooks(t *testing.T) {
 	}
 }
 
-func TestAddHandlers(t *testing.T) {
-	h := http.NewServeMux()
-
-	hooks := make(map[string]server.Hook)
-	hooks["test1"] = server.Hook{Type: "github", Path: "/github1", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test2"] = server.Hook{Type: "github", Path: "/github2", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test3"] = server.Hook{Type: "github", Path: "/github2", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test4"] = server.Hook{Type: "bitbucket", Path: "/bitbucket1", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test5"] = server.Hook{Type: "gitlab", Path: "/gitlab1", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test6"] = server.Hook{Type: "gitlab", Path: "invalid", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test7"] = server.Hook{Type: "gitlab", Path: "/hello", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test8"] = server.Hook{Type: "invalid", Path: "/invalid1", Cmd: []string{"true"}, Timeout: 500}
-	hooks["test9"] = server.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{}, Timeout: 500}
-	hooks["test10"] = server.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{"true"}, Timeout: 0}
-	hooks["test11"] = server.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{"true"}, Timeout: -10}
-	hooks["test12"] = server.Hook{Type: "bitbucket", Path: "/invalid2", Cmd: []string{"true"}, Timeout: 10, Concurrency: -10}
-
-	cmdLog := server.NewMemoryCommandLog()
-	hooksHandled := addHandlers(cmdLog, hooks, h)
-	removed := map[string]string{
-		"test3":  "Duplicated Path",
-		"test6":  "Invalid path (must start with /)",
-		"test7":  "/hello is a reserved path",
-		"test8":  "Invalid type",
-		"test9":  "Invalid Cmd (must be present)",
-		"test10": "Timeout must be greater than 0",
-		"test11": "Timeout must be greater than 0",
-		"test12": "Concurrency must be greater than 0",
-	}
-
-	if len(hooksHandled) != (len(hooks) - len(removed)) {
-		t.Errorf("Only %d hooks should have been added, got %d", len(hooks)-len(removed), len(hooksHandled))
-	}
-
-	for k, v := range removed {
-		if _, found := hooksHandled[k]; found {
-			t.Errorf("Case %s should have been removed due to: %s", k, v)
-		}
-	}
-}
-
 func TestSetupLogLevel(t *testing.T) {
 	testCases := []struct {
 		level    string
@@ -104,48 +60,5 @@ func TestSetupLogLevel(t *testing.T) {
 		if level != test.expected {
 			t.Errorf("%02d. Log level is not the expected, got %v but expected %v", i, level, test.expected)
 		}
-	}
-}
-
-func TestSetupCommandLog(t *testing.T) {
-	cmdLog := setupCommandLog("")
-	switch v := cmdLog.(type) {
-	case *server.MemoryCommandLog:
-	default:
-		t.Errorf("Command Log type is not the expected, got %#v but expected MemoryCommandLog", v)
-	}
-
-	cmdLog = setupCommandLog("/notfound")
-	switch v := cmdLog.(type) {
-	case *server.MemoryCommandLog:
-	default:
-		t.Errorf("Command Log type is not the expected, got %#v but expected MemoryCommandLog", v)
-	}
-	cmdLog = setupCommandLog("./")
-	switch v := cmdLog.(type) {
-	case *server.DiskCommandLog:
-	default:
-		t.Errorf("Command Log type is not the expected, got %#v but expected DiskCommandLog", v)
-	}
-}
-
-func TestSetupWebServer(t *testing.T) {
-	cmdLog := server.NewMemoryCommandLog()
-	hooks := make(map[string]server.Hook)
-	hooks["test1"] = server.Hook{Type: "github", Path: "/github1", Cmd: []string{"true"}, Timeout: 500}
-
-	webServer, err := setupWebServer("127.0.0.1", 10000, cmdLog, hooks)
-	if err != nil {
-		t.Errorf("setupWebServer should not fail with proper args: %s", err)
-	}
-	if webServer.Addr != "127.0.0.1:10000" {
-		t.Errorf("Server should have been setup to listen on 127.0.0.1:10000")
-	}
-
-	hooks = make(map[string]server.Hook)
-
-	_, err = setupWebServer("127.0.0.1", 10000, cmdLog, hooks)
-	if err == nil {
-		t.Errorf("setupWebServer should fail with no hooks to serve")
 	}
 }
