@@ -16,6 +16,7 @@ type Server struct {
 	TLSCert        string
 	TLSKey         string
 	CmdLogDir      string
+	CmdLogLimit    int
 	Hooks          map[string]Hook
 	MuxHandler     *http.ServeMux
 	HooksHandled   map[string]int
@@ -55,7 +56,7 @@ func (s *Server) Stop() (err error) {
 
 // setCommandLog sets and configures the internal CommandLog
 func (s *Server) setCommandLog() (err error) {
-	s.CmdLog = NewMemoryCommandLog()
+	s.CmdLog = NewMemoryCommandLog(s.CmdLogLimit)
 	defer func() {
 		switch s.CmdLog.(type) {
 		case *MemoryCommandLog:
@@ -75,7 +76,7 @@ func (s *Server) setCommandLog() (err error) {
 	}
 	fileMode, statErr := os.Stat(absLogDir)
 	if statErr == nil && fileMode.IsDir() {
-		s.CmdLog = NewDiskCommandLog(s.CmdLogDir)
+		s.CmdLog = NewDiskCommandLog(s.CmdLogDir, s.CmdLogLimit)
 	}
 	return
 }

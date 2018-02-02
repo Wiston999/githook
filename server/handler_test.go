@@ -151,7 +151,7 @@ func TestRepoRequestHandler(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cmdLog := NewMemoryCommandLog()
+		cmdLog := NewMemoryCommandLog(100)
 
 		rr := httptest.NewRecorder()
 		handler := http.HandlerFunc(RepoRequestHandler(cmdLog, "test", hook))
@@ -223,7 +223,7 @@ func TestCommandLogRESTHandler(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cmdLog := NewMemoryCommandLog()
+		cmdLog := NewMemoryCommandLog(100)
 
 		for i := 0; i < logResults; i = i + 1 {
 			cmdResult := CommandResult{Stdout: []byte(strconv.Itoa(i)), Stderr: []byte(strconv.Itoa(i))}

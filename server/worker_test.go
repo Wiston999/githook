@@ -61,7 +61,7 @@ func TestCommandWorker(t *testing.T) {
 		workChannel <- CommandJob{Cmd: test.cmd, ID: string(i), Timeout: test.timeout}
 	}
 
-	cmdLog := NewMemoryCommandLog()
+	cmdLog := NewMemoryCommandLog(100)
 	resultChannel := make(chan int)
 	go func(resChan chan int) {
 		resultChannel <- CommandWorker("CommandWorkerTest", workChannel, cmdLog)

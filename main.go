@@ -55,6 +55,7 @@ var opts struct {
 	Addr       string `long:"address" default:"0.0.0.0" description:"Server listening(bind) address"`
 	Port       int    `short:"p" long:"port" default:"65000" description:"Server listening port"`
 	LogDir     string `long:"command_log_dir" description:"CommandLogDir to store requests' results leave empty to use in-memory storage"`
+	LogLimit   int    `long:"command_log_limit" default:"1000" description:"Maximum number of elements to store in CommandLog"`
 	LogLevel   string `long:"loglvl" default:"warn" value-name:"choices" choice:"err" choice:"warning" choice:"warn" choice:"info" choice:"debug" description:"Log facility level"`
 	TLSCert    string `long:"tlscert" description:"Certificate file for TLS support"`
 	TLSKey     string `long:"tlskey" description:"Key file for TLS support, TLS is tried if both tlscert and tlskey are provided"`
@@ -75,11 +76,12 @@ func main() {
 	}
 
 	server := server.Server{
-		Server:    &http.Server{Addr: fmt.Sprintf("%s:%d", opts.Addr, opts.Port)},
-		TLSCert:   opts.TLSCert,
-		TLSKey:    opts.TLSKey,
-		CmdLogDir: opts.LogDir,
-		Hooks:     hooks,
+		Server:      &http.Server{Addr: fmt.Sprintf("%s:%d", opts.Addr, opts.Port)},
+		TLSCert:     opts.TLSCert,
+		TLSKey:      opts.TLSKey,
+		CmdLogDir:   opts.LogDir,
+		CmdLogLimit: opts.LogLimit,
+		Hooks:       hooks,
 	}
 	log.WithFields(log.Fields{"addr": opts.Addr, "port": opts.Port}).Debug("Starting web server")
 	log.Fatal(server.ListenAndServe())
