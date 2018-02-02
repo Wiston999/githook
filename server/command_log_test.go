@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -217,7 +216,6 @@ func TestRotateResults(t *testing.T) {
 			if err != nil {
 				t.Errorf("Unable to get memoryCmdLog: %v", err)
 			}
-			fmt.Printf("#%02d. %#v\n", j, memoryCmdLog.CommandLog)
 			if rotateReturn != tCase.expected {
 				t.Errorf(
 					"#%02d. [MemoryCommandLog] Expected rotate returned with %d parameter to be %d, got %d",

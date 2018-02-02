@@ -14,20 +14,24 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var workerChannels map[string]chan CommandJob
-
-func init() {
-	workerChannels = make(map[string]chan CommandJob)
-}
-
 // JSONRequestMiddleware implements an http.HandlerFunc middleware that sets
 // the HTTP Content-Type header and prints a log line when the request is received and completed
 func JSONRequestMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID, _ := uuid.NewV4()
 		requestIDStr := requestID.String()
-		log.WithFields(log.Fields{"reqId": requestID, "url": r.URL.Path, "method": r.Method}).Info("Received request")
-		defer log.WithFields(log.Fields{"reqID": requestID}).Info("Request completed")
+		log.WithFields(log.Fields{
+			"reqId":  requestID,
+			"url":    r.URL.Path,
+			"method": r.Method,
+			"remote": r.RemoteAddr,
+		}).Info("Received request")
+		defer log.WithFields(log.Fields{
+			"reqId":  requestID,
+			"url":    r.URL.Path,
+			"method": r.Method,
+			"remote": r.RemoteAddr,
+		}).Info("Request completed")
 
 		w.Header().Set("Content-Type", "application/json")
 		ctx := context.WithValue(r.Context(), "requestID", requestIDStr)
@@ -74,16 +78,7 @@ func CommandLogRESTHandler(cmdLog CommandLog) func(http.ResponseWriter, *http.Re
 // RepoRequestHandler setups an http.HandlerFunc using Hook information
 // This function makes the hard work of setting up a listener hook on the HTTP Server
 // based on an Hook structure
-func RepoRequestHandler(cmdLog CommandLog, hookName string, hookInfo Hook) func(http.ResponseWriter, *http.Request) {
-	workerChannels[hookName] = make(chan CommandJob, 1000)
-	for i := 0; i < hookInfo.Concurrency; i++ {
-		go CommandWorker(hookName, workerChannels[hookName], cmdLog)
-	}
-	log.WithFields(log.Fields{
-		"count": hookInfo.Concurrency,
-		"hook":  hookName,
-	}).Info("Started command workers")
-
+func RepoRequestHandler(cmdLog CommandLog, workerChannel chan CommandJob, hookName string, hookInfo Hook) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		requestID := r.Context().Value("requestID").(string)
 		repoEvent := &event.RepoEvent{}
@@ -146,7 +141,7 @@ func RepoRequestHandler(cmdLog CommandLog, hookName string, hookInfo Hook) func(
 			response.Msg = fmt.Sprintf("Command '%s' sent to execute with result", strings.Join(cmd, " "))
 			response.Body = result
 		} else {
-			workerChannels[hookName] <- CommandJob{Cmd: cmd, ID: requestID, Timeout: hookInfo.Timeout}
+			workerChannel <- CommandJob{Cmd: cmd, ID: requestID, Timeout: hookInfo.Timeout}
 			response.Status, response.Msg, response.Body = 200, "Command sent to execute", strings.Join(cmd, " ")
 		}
 		json.NewEncoder(w).Encode(response)
