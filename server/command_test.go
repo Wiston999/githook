@@ -117,6 +117,13 @@ func TestRunCommand(t *testing.T) {
 			true,
 		},
 		{
+			[]string{"/bin/false"},
+			10,
+			"",
+			"",
+			true,
+		},
+		{
 			[]string{"ifthiscommandexistsiwillfail"},
 			10,
 			"",

@@ -13,15 +13,16 @@ import (
 // Server an http.Server all the needed information for starting and running the http server
 type Server struct {
 	*http.Server
-	TLSCert        string
-	TLSKey         string
-	CmdLogDir      string
-	CmdLogLimit    int
-	Hooks          map[string]Hook
-	MuxHandler     *http.ServeMux
-	HooksHandled   map[string]int
-	WorkerChannels map[string]chan CommandJob
-	CmdLog         CommandLog
+	TLSCert           string
+	TLSKey            string
+	CmdLogDir         string
+	CmdLogLimit       int
+	WorkerChannelSize int
+	Hooks             map[string]Hook
+	MuxHandler        *http.ServeMux
+	HooksHandled      map[string]int
+	WorkerChannels    map[string]chan CommandJob
+	CmdLog            CommandLog
 }
 
 // ListenAndServe set ups everything needed for the server to run and
@@ -33,6 +34,9 @@ func (s *Server) ListenAndServe() (err error) {
 	}
 	if err = s.setCommandLog(); err != nil {
 		return
+	}
+	if s.WorkerChannels == nil {
+		s.WorkerChannels = make(map[string]chan CommandJob)
 	}
 	if err = s.setHooks(); err != nil {
 		return
@@ -82,7 +86,7 @@ func (s *Server) setCommandLog() (err error) {
 }
 
 func (s *Server) setAdminEndpoints() (err error) {
-	s.MuxHandler.HandleFunc("/hello", JSONRequestMiddleware(HelloHandler))
+	s.MuxHandler.HandleFunc("/admin/hello", JSONRequestMiddleware(HelloHandler))
 	s.MuxHandler.HandleFunc("/admin/cmdlog", JSONRequestMiddleware(CommandLogRESTHandler(s.CmdLog)))
 	return
 }
@@ -103,8 +107,8 @@ func (s *Server) setHooks() (err error) {
 			log.WithFields(log.Fields{"hook": k}).Warn("Unknown repository type, it must be one of: bitbucket, github or gitlab")
 			continue
 		}
-		if !strings.HasPrefix(v.Path, "/") || v.Path == "/hello" {
-			log.WithFields(log.Fields{"hook": k}).Warn("Path must start with / and be different of /hello")
+		if !strings.HasPrefix(v.Path, "/") || strings.HasPrefix(v.Path, "/admin") {
+			log.WithFields(log.Fields{"hook": k}).Warn("Path must start with / and must not start with /admin")
 			continue
 		}
 		if v.Timeout <= 0 {
@@ -123,7 +127,16 @@ func (s *Server) setHooks() (err error) {
 			v.Concurrency = 1
 		}
 
-		s.MuxHandler.HandleFunc(v.Path, JSONRequestMiddleware(RepoRequestHandler(s.CmdLog, k, v)))
+		s.WorkerChannels[k] = make(chan CommandJob, s.WorkerChannelSize)
+		s.MuxHandler.HandleFunc(v.Path, JSONRequestMiddleware(RepoRequestHandler(s.CmdLog, s.WorkerChannels[k], k, v)))
+		for i := 0; i < v.Concurrency; i++ {
+			go CommandWorker(k, s.WorkerChannels[k], s.CmdLog)
+		}
+		log.WithFields(log.Fields{
+			"count": v.Concurrency,
+			"hook":  k,
+		}).Info("Started command workers")
+
 		s.HooksHandled[v.Path] = 1
 	}
 

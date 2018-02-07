@@ -153,9 +153,11 @@ func TestRepoRequestHandler(t *testing.T) {
 		}
 
 		cmdLog := NewMemoryCommandLog(100)
+		workerChannel := make(chan CommandJob, 100)
+		go CommandWorker("TestRepoRequestHandler", workerChannel, cmdLog)
 
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(RepoRequestHandler(cmdLog, "test", hook))
+		handler := http.HandlerFunc(RepoRequestHandler(cmdLog, workerChannel, "test", hook))
 
 		ctx := context.WithValue(req.Context(), "requestID", "my-request-id")
 		handler.ServeHTTP(rr, req.WithContext(ctx))
@@ -225,6 +227,7 @@ func TestCommandLogRESTHandler(t *testing.T) {
 		{"admin/log", logResults, false},
 		{"admin/log?count=1", 1, false},
 		{"admin/log?count=-1", logResults, false},
+		{"admin/log?count=invalidnumber", 0, true},
 	}
 
 	for i, test := range testCases {
@@ -263,8 +266,10 @@ func TestCommandLogRESTHandler(t *testing.T) {
 				i,
 				status, http.StatusOK)
 		}
-		if jsonBody.Status != 200 {
+		if !test.Err && jsonBody.Status != 200 {
 			t.Errorf("%02d. Status field in response should have 200, got %v", i, jsonBody.Status)
+		} else if test.Err && jsonBody.Status != 500 {
+			t.Errorf("%02d. Status field in response should have 500, got %v", i, jsonBody.Status)
 		}
 		results := jsonBody.Body.([]interface{})
 		if len(results) != test.Count {
