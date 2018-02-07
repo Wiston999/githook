@@ -12,6 +12,8 @@ type CommandJob struct {
 	Response chan CommandResult
 }
 
+// CommandWorker runs command receiving from jobs channel, it also stores
+// the command execution result into a CommandLog interface
 func CommandWorker(id string, jobs <-chan CommandJob, cmdLog CommandLog) (executed int) {
 	for job := range jobs {
 		log.WithFields(log.Fields{

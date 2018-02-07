@@ -47,9 +47,8 @@ func (s *Server) ListenAndServe() (err error) {
 	s.Server.Handler = s.MuxHandler
 	if s.TLSCert != "" && s.TLSKey != "" {
 		return s.Server.ListenAndServeTLS(s.TLSCert, s.TLSKey)
-	} else {
-		return s.Server.ListenAndServe()
 	}
+	return s.Server.ListenAndServe()
 }
 
 // Stop tries to gracefully stop the http.Server finishing all pending tasks
