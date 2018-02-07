@@ -139,15 +139,21 @@ func RepoRequestHandler(cmdLog CommandLog, hookName string, hookInfo Hook) func(
 			return
 		}
 
+		cmdJob := CommandJob{Cmd: cmd, ID: requestID, Timeout: hookInfo.Timeout}
 		if sync {
-			result := RunCommand(cmd, hookInfo.Timeout)
-			cmdLog.AppendResult(result)
-			response.Status = 200
-			response.Msg = fmt.Sprintf("Command '%s' sent to execute with result", strings.Join(cmd, " "))
+			cmdJob.Response = make(chan CommandResult, 1)
+		}
+		workerChannels[hookName] <- cmdJob
+		response.Status, response.Msg, response.Body = 200, "Command sent to execute", strings.Join(cmd, " ")
+		if sync {
+			log.WithFields(log.Fields{
+				"cmd":       cmdJob.Cmd,
+				"queue_len": len(workerChannels[hookName]),
+				"reqId":     requestID,
+			}).Info("Waiting for command to complete before returning")
+
+			result := <-cmdJob.Response
 			response.Body = result
-		} else {
-			workerChannels[hookName] <- CommandJob{Cmd: cmd, ID: requestID, Timeout: hookInfo.Timeout}
-			response.Status, response.Msg, response.Body = 200, "Command sent to execute", strings.Join(cmd, " ")
 		}
 		json.NewEncoder(w).Encode(response)
 	}

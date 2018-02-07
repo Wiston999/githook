@@ -6,9 +6,10 @@ import (
 
 // CommandJob encodes a request to execute a command
 type CommandJob struct {
-	Cmd     []string
-	ID      string
-	Timeout int
+	Cmd      []string
+	ID       string
+	Timeout  int
+	Response chan CommandResult
 }
 
 func CommandWorker(id string, jobs <-chan CommandJob, cmdLog CommandLog) (executed int) {
@@ -36,6 +37,9 @@ func CommandWorker(id string, jobs <-chan CommandJob, cmdLog CommandLog) (execut
 		}
 		cmdLog.AppendResult(cmdResult)
 		executed++
+		if job.Response != nil {
+			job.Response <- cmdResult
+		}
 	}
 	return
 }
