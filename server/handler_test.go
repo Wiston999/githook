@@ -139,10 +139,11 @@ func TestRepoRequestHandler(t *testing.T) {
 
 	for i, test := range testCases {
 		hook := Hook{
-			Type:    test.Type,
-			Cmd:     test.Cmd,
-			Path:    "/payloadtest",
-			Timeout: 10,
+			Type:        test.Type,
+			Cmd:         test.Cmd,
+			Path:        "/payloadtest",
+			Timeout:     10,
+			Concurrency: 1,
 		}
 
 		req, err := http.NewRequest("POST", test.Query, test.Payload)
@@ -166,8 +167,18 @@ func TestRepoRequestHandler(t *testing.T) {
 		}
 
 		if test.Sync {
-			if !strings.Contains(jsonBody.Msg, "with result") {
-				t.Errorf("%02d. Msg field in response should contain with result string when sync execution, got %s", i, jsonBody.Msg)
+			if _, isString := jsonBody.Body.(string); isString {
+				t.Errorf("%02d. Body field in response when sync execution should be an struct with command result, got %s", i, jsonBody.Body)
+			}
+			bodyMap := jsonBody.Body.(map[string]interface{})
+			if _, found := bodyMap["cmd"]; !found {
+				t.Errorf("%02d. Body should contain the key 'cmd' when sync execution", i)
+			}
+			if _, found := bodyMap["stdout"]; !found {
+				t.Errorf("%02d. Body should contain the key 'stdout' when sync execution", i)
+			}
+			if _, found := bodyMap["stderr"]; !found {
+				t.Errorf("%02d. Body should contain the key 'stderr' when sync execution", i)
 			}
 		}
 
