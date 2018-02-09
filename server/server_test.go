@@ -2,18 +2,57 @@ package server
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 )
 
 func TestListenAndServe(t *testing.T) {
 	s := &Server{}
-	s.MuxHandler = http.NewServeMux()
 	s.CmdLog = NewMemoryCommandLog(10)
-	s.WorkerChannels = make(map[string]chan CommandJob)
 
-	err := s.Stop()
+	err := s.ListenAndServe()
+	if err == nil {
+		t.Errorf("ListenAndServe must fail without configured hooks")
+	}
+
+	if s.MuxHandler == nil {
+		t.Errorf("ListenAndServe must setup MuxHandler if not previously defined")
+	}
+
+	if s.HooksHandled == nil {
+		t.Errorf("ListenAndServe must setup HooksHandled if not previously defined")
+	}
+
+	if s.WorkerChannels == nil {
+		t.Errorf("ListenAndServe must setup WorkerChannels if not previously defined")
+	}
+
+	s.Hooks = make(map[string]Hook)
+	s.Hooks["test"] = Hook{
+		Type:        "bitbucket",
+		Cmd:         []string{"echo", "test"},
+		Path:        "/test",
+		Timeout:     1,
+		Concurrency: 1,
+	}
+
+	s.Server = &http.Server{}
+	err = s.ListenAndServe()
+	if err == nil {
+		t.Errorf("ListenAndServe must fail with no Addr set")
+	}
+
+	s.Server.Addr = "0.0.0.0:65000"
+	go func() {
+		err = s.ListenAndServe()
+		if err != nil {
+			t.Errorf("ListenAndServe must not fail proper settings: %s", err)
+		}
+	}()
+
+	err = s.Stop()
 	if err != nil {
-		t.Errorf("Stop should never fail: %s", err)
+		t.Errorf("Stop should not fail in usual conditions: %s", err)
 	}
 }
 
@@ -42,6 +81,7 @@ func TestSetHooks(t *testing.T) {
 	hooks["test13"] = Hook{Type: "bitbucket", Path: "/admin", Cmd: []string{"true"}, Timeout: 500}
 
 	s.Hooks = hooks
+	s.HooksHandled = make(map[string]int)
 	s.WorkerChannels = make(map[string]chan CommandJob)
 	err = s.setHooks()
 
@@ -57,12 +97,12 @@ func TestSetHooks(t *testing.T) {
 		"test9":  "Invalid Cmd (must be present)",
 		"test10": "Timeout must be greater than 0",
 		"test11": "Timeout must be greater than 0",
-		"test12": "Concurrency must be greater than 0",
 		"test13": "/admin is a reserved path",
 	}
 
 	hooksHandled := s.HooksHandled
 	if len(hooksHandled) != (len(hooks) - len(removed)) {
+		t.Errorf("%#v", hooksHandled)
 		t.Errorf("Only %d hooks should have been added, got %d", len(hooks)-len(removed), len(hooksHandled))
 	}
 
@@ -76,27 +116,31 @@ func TestSetHooks(t *testing.T) {
 	}
 }
 
-func TestStop(t *testing.T) {
-	s := &Server{}
-	s.MuxHandler = http.NewServeMux()
-	s.CmdLog = NewMemoryCommandLog(10)
-	s.WorkerChannels = make(map[string]chan CommandJob)
-
-	err := s.Stop()
-	if err != nil {
-		t.Errorf("Stop should never fail: %s", err)
-	}
-}
-
 func TestSetAdminEndpoints(t *testing.T) {
 	s := &Server{}
 	s.MuxHandler = http.NewServeMux()
 	s.CmdLog = NewMemoryCommandLog(10)
+	s.HooksHandled = make(map[string]int)
 	s.WorkerChannels = make(map[string]chan CommandJob)
 
 	err := s.setAdminEndpoints()
 	if err != nil {
 		t.Errorf("setAdminEndpoints should never fail: %s", err)
+	}
+
+	for k, _ := range s.HooksHandled {
+		if !strings.HasPrefix(k, "/admin") {
+			t.Errorf("setAdminEndpoints must set all enpoints begining with /admin, found: %s", k)
+		}
+	}
+
+	hooksBefore := len(s.HooksHandled)
+	err = s.setAdminEndpoints()
+	if err != nil {
+		t.Errorf("setAdminEndpoints should never fail: %s", err)
+	}
+	if len(s.HooksHandled) != hooksBefore {
+		t.Errorf("setAdminEndpoints should not add new endpoints if run more than one time")
 	}
 }
 

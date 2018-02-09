@@ -1,11 +1,13 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -32,8 +34,8 @@ func (s *Server) ListenAndServe() (err error) {
 	if s.MuxHandler == nil {
 		s.MuxHandler = http.NewServeMux()
 	}
-	if err = s.setCommandLog(); err != nil {
-		return
+	if s.HooksHandled == nil {
+		s.HooksHandled = make(map[string]int)
 	}
 	if s.WorkerChannels == nil {
 		s.WorkerChannels = make(map[string]chan CommandJob)
@@ -41,9 +43,9 @@ func (s *Server) ListenAndServe() (err error) {
 	if err = s.setHooks(); err != nil {
 		return
 	}
-	if err = s.setAdminEndpoints(); err != nil {
-		return
-	}
+	s.setCommandLog()
+	s.setAdminEndpoints()
+
 	s.Server.Handler = s.MuxHandler
 	if s.TLSCert != "" && s.TLSKey != "" {
 		return s.Server.ListenAndServeTLS(s.TLSCert, s.TLSKey)
@@ -54,7 +56,9 @@ func (s *Server) ListenAndServe() (err error) {
 // Stop tries to gracefully stop the http.Server finishing all pending tasks
 // and closing underlying channels
 func (s *Server) Stop() (err error) {
-	return
+	log.Info("Stopping http server with 5 seconds timeout")
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	return s.Server.Shutdown(ctx)
 }
 
 // setCommandLog sets and configures the internal CommandLog
@@ -65,7 +69,7 @@ func (s *Server) setCommandLog() (err error) {
 		case *MemoryCommandLog:
 			log.Warn("CommandLogDir setting not found or invalid, using in memory command log")
 		case *DiskCommandLog:
-			log.Info("Commands will be logged to", s.CmdLogDir)
+			log.Info("Commands will be logged to ", s.CmdLogDir)
 		}
 	}()
 
@@ -85,14 +89,19 @@ func (s *Server) setCommandLog() (err error) {
 }
 
 func (s *Server) setAdminEndpoints() (err error) {
-	s.MuxHandler.HandleFunc("/admin/hello", JSONRequestMiddleware(HelloHandler))
-	s.MuxHandler.HandleFunc("/admin/cmdlog", JSONRequestMiddleware(CommandLogRESTHandler(s.CmdLog)))
+	if _, ok := s.HooksHandled["/admin/hello"]; !ok {
+		s.MuxHandler.HandleFunc("/admin/hello", JSONRequestMiddleware(HelloHandler))
+		s.HooksHandled["/admin/hello"] = 1
+	}
+	if _, ok := s.HooksHandled["/admin/cmdlog"]; !ok {
+		s.MuxHandler.HandleFunc("/admin/cmdlog", JSONRequestMiddleware(CommandLogRESTHandler(s.CmdLog)))
+		s.HooksHandled["/admin/cmdlog"] = 1
+	}
 	return
 }
 
 // setHooks configures hook handlers into an http.ServeMux handler given a map of hooks
 func (s *Server) setHooks() (err error) {
-	s.HooksHandled = make(map[string]int)
 	for k, v := range s.Hooks {
 		log.WithFields(log.Fields{
 			"name": k,
@@ -100,6 +109,7 @@ func (s *Server) setHooks() (err error) {
 		}).Info("Read hook")
 		if _, exists := s.HooksHandled[v.Path]; exists {
 			log.WithFields(log.Fields{"hook": k}).Warn("Path ", v.Path, " already defined, ignoring...")
+			s.HooksHandled[v.Path] = 1
 			continue
 		}
 		if v.Type != "bitbucket" && v.Type != "github" && v.Type != "gitlab" {
@@ -118,14 +128,10 @@ func (s *Server) setHooks() (err error) {
 			log.WithFields(log.Fields{"hook": k}).Warn("Cmd must be defined")
 			continue
 		}
-		if v.Concurrency < 0 {
-			log.WithFields(log.Fields{"hook": k}).Warn("Concurrency level must be a value greater than 0")
-			continue
-		} else if v.Concurrency == 0 {
-			log.WithFields(log.Fields{"hook": k}).Warn("Concurrency level of 0 found, falling back to default 1")
+		if v.Concurrency == 0 {
+			log.WithFields(log.Fields{"hook": k}).Warn("Concurrency level of 0 or below found, falling back to default 1")
 			v.Concurrency = 1
 		}
-
 		s.WorkerChannels[k] = make(chan CommandJob, s.WorkerChannelSize)
 		s.MuxHandler.HandleFunc(v.Path, JSONRequestMiddleware(RepoRequestHandler(s.CmdLog, s.WorkerChannels[k], k, v)))
 		for i := 0; i < v.Concurrency; i++ {
@@ -139,9 +145,16 @@ func (s *Server) setHooks() (err error) {
 		s.HooksHandled[v.Path] = 1
 	}
 
-	log.WithFields(log.Fields{"hooks": s.HooksHandled}).Debug("Hooks parsed from configuration file")
-	if len(s.HooksHandled) == 0 {
+	adminHooks := 0
+	for k, _ := range s.HooksHandled {
+		if strings.HasPrefix(k, "/admin") {
+			adminHooks++
+		}
+	}
+	if len(s.HooksHandled) == adminHooks {
 		err = errors.New("No hooks parsed")
 	}
+	log.WithFields(log.Fields{"hooks": s.HooksHandled}).Debug("Hooks parsed from configuration file")
+
 	return
 }
