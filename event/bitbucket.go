@@ -1,42 +1,12 @@
 package event
 
 import (
-	"encoding/json"
+	"bytes"
 	"errors"
 	"net/http"
+
+	"github.com/tidwall/gjson"
 )
-
-type bitbucketPayloadType struct {
-	Push push
-}
-
-type push struct {
-	Changes []change
-}
-
-type change struct {
-	Old changeStruct
-	New changeStruct
-}
-
-type changeStruct struct {
-	Type   string
-	Name   string
-	Target target
-}
-
-type target struct {
-	Hash   string
-	Author author
-}
-
-type author struct {
-	User actor
-}
-
-type actor struct {
-	Username string
-}
 
 // NewBitbucketEvent takes an http.Request object and parses it corresponding
 // to Bitbucket webhook syntax into an RepoEvent object.
@@ -46,22 +16,18 @@ func NewBitbucketEvent(request *http.Request) (event *RepoEvent, err error) {
 		err = errors.New("Unable to parse request.Body == nil")
 		return
 	}
-	var parsedPayload bitbucketPayloadType
-	var branch, author, commit string
-	err = json.NewDecoder(request.Body).Decode(&parsedPayload)
 
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(request.Body)
+	bodyStr := buf.String()
 	if err != nil {
 		return
 	}
 
-	if len(parsedPayload.Push.Changes) > 0 {
-		branch = parsedPayload.Push.Changes[0].New.Name
-		commit = parsedPayload.Push.Changes[0].New.Target.Hash
-		author = parsedPayload.Push.Changes[0].New.Target.Author.User.Username
-	} else {
-		err = errors.New("Changes array should contain at least 1 element, got 0")
-		return
-	}
+	branch := gjson.Get(bodyStr, "push.changes.0.new.name").String()
+	commit := gjson.Get(bodyStr, "push.changes.0.new.target.hash").String()
+	author := gjson.Get(bodyStr, "push.changes.0.new.target.author.user.username").String()
+
 	if branch == "" {
 		err = errors.New("Unable to parse branch")
 	}

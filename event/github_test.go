@@ -22,11 +22,11 @@ func TestGithubEventOK(t *testing.T) {
 	}
 
 	if event.Branch != "master" {
-		t.Error("event.Branch must be master, got", event.Author)
+		t.Error("event.Branch must be master, got", event.Branch)
 	}
 
 	if event.Commit != "eddf11a4056b1abc8002c005ddc0a20cd5f1038a" {
-		t.Error("event.Commit must be eddf11a4056b1abc8002c005ddc0a20cd5f1038a, got", event.Author)
+		t.Error("event.Commit must be eddf11a4056b1abc8002c005ddc0a20cd5f1038a, got", event.Commit)
 	}
 
 	v := url.Values{}
@@ -43,11 +43,11 @@ func TestGithubEventOK(t *testing.T) {
 	}
 
 	if event.Branch != "master" {
-		t.Error("event.Branch must be master, got", event.Author)
+		t.Error("event.Branch must be master, got", event.Branch)
 	}
 
 	if event.Commit != "eddf11a4056b1abc8002c005ddc0a20cd5f1038a" {
-		t.Error("event.Commit must be eddf11a4056b1abc8002c005ddc0a20cd5f1038a, got", event.Author)
+		t.Error("event.Commit must be eddf11a4056b1abc8002c005ddc0a20cd5f1038a, got", event.Commit)
 	}
 }
 

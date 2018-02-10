@@ -1,60 +1,46 @@
 package event
 
 import (
-	"encoding/json"
+	"bytes"
 	"errors"
-	"io/ioutil"
+	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/tidwall/gjson"
 )
-
-type githubPayloadType struct {
-	Ref        string
-	HeadCommit headCommit `json:"head_commit" yaml:"head_commit"`
-}
-
-type headCommit struct {
-	ID     string
-	Author commitAuthor
-}
-
-type commitAuthor struct {
-	Username string
-}
 
 // NewGithubEvent takes an http.Request object and parses it corresponding
 // to Github webhook syntax into an RepoEvent object.
 // It returns a RepoEvent object and an error in case of error
 func NewGithubEvent(request *http.Request) (event *RepoEvent, err error) {
-	var payload []byte
+	var payload string
 	if request.Body == nil {
 		err = errors.New("Unable to parse request.Body == nil")
 		return
 	}
 	switch request.Header.Get("Content-Type") {
 	case "application/json":
-		payload, err = ioutil.ReadAll(request.Body)
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(request.Body)
+		payload = buf.String()
 	case "application/x-www-form-urlencoded":
 		err = request.ParseForm()
-		payload = []byte(request.PostFormValue("payload"))
+		payload = request.PostFormValue("payload")
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	var parsedPayload githubPayloadType
-	var branch, author, commit string
-	err = json.Unmarshal(payload, &parsedPayload)
-	if err != nil {
-		return nil, err
-	}
+	sl := strings.Split(gjson.Get(payload, "ref").String(), "/")
+	branch := sl[len(sl)-1]
+	commit := gjson.Get(payload, "head_commit.id").String()
+	author := gjson.Get(payload, "head_commit.author.username").String()
 
-	sl := strings.Split(parsedPayload.Ref, "/")
-	branch = sl[len(sl)-1]
-	commit = parsedPayload.HeadCommit.ID
-	author = parsedPayload.HeadCommit.Author.Username
-
+	fmt.Printf("Author: %s\n", author)
+	fmt.Printf("Branch: %s\n", branch)
+	fmt.Printf("Commit: %s\n", commit)
 	if branch == "" {
 		err = errors.New("Unable to parse branch")
 	}

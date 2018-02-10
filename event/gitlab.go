@@ -1,17 +1,13 @@
 package event
 
 import (
-	"encoding/json"
+	"bytes"
 	"errors"
 	"net/http"
 	"strings"
-)
 
-type gitlabPayloadType struct {
-	Ref          string `json:"ref" yaml:"ref"`
-	UserUsername string `json:"user_username" yaml:"user_username"`
-	CheckoutSha  string `json:"checkout_sha" yaml:"checkout_sha"`
-}
+	"github.com/tidwall/gjson"
+)
 
 // NewGitlabEvent takes an http.Request object and parses it corresponding
 // to Gitlab webhook syntax into an RepoEvent object.
@@ -21,18 +17,14 @@ func NewGitlabEvent(request *http.Request) (event *RepoEvent, err error) {
 		err = errors.New("Unable to parse request.Body == nil")
 		return
 	}
-	var parsedPayload gitlabPayloadType
-	var branch, author, commit string
-	err = json.NewDecoder(request.Body).Decode(&parsedPayload)
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(request.Body)
+	payload := buf.String()
 
-	if err != nil {
-		return
-	}
-
-	sl := strings.Split(parsedPayload.Ref, "/")
-	branch = sl[len(sl)-1]
-	commit = parsedPayload.CheckoutSha
-	author = parsedPayload.UserUsername
+	sl := strings.Split(gjson.Get(payload, "ref").String(), "/")
+	branch := sl[len(sl)-1]
+	commit := gjson.Get(payload, "checkout_sha").String()
+	author := gjson.Get(payload, "user_username").String()
 
 	if branch == "" {
 		err = errors.New("Unable to parse branch")
