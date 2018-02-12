@@ -4,6 +4,7 @@
       type: bitbucket
       path: /payload
       timeout: 600
+      concurrency: 1
       cmd:
         - echo
         - '{{.Branch}}'

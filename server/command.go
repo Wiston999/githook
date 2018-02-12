@@ -6,23 +6,21 @@ import (
 	"errors"
 	"io/ioutil"
 	"os/exec"
-	"strings"
 	"text/template"
 	"time"
 
 	"github.com/Wiston999/githook/event"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // CommandResult stores the result of a command execution
 type CommandResult struct {
-	Err    error  `json:"err"`
-	Stdout []byte `json:"stdout"`
-	Stderr []byte `json:"stderr"`
+	Cmd    []string `json:"cmd"`
+	Err    error    `json:"err"`
+	Stdout []byte   `json:"stdout"`
+	Stderr []byte   `json:"stderr"`
 }
 
-// TranslateParams translates a list of command parameters (from event.Hook) based
+// TranslateParams translates a list of command parameters (from Hook) based
 // on the event received at event.RepoEvent. It uses Go's built-in templating (text/template)
 // so all operations on templates can be performed on the command parameters.
 // I.e.: `cmd := ["{{.Branch}}", "is", "the", "branch"]` with event.Branch := "develop" will
@@ -49,13 +47,11 @@ func TranslateParams(cmd []string, event event.RepoEvent) (trCmd []string, err e
 
 // RunCommand executes the hook command on the system, it takes an array of string
 // representing the command to be returned, a timeout in seconds and a channel for returning the data.
-// This function is intended to be run as a goroutine so that's why it returns the result via
-// a channel instead of standard function return
-func RunCommand(cmd []string, timeout int, ch chan CommandResult) {
-	result := CommandResult{}
+// It returns an instance of CommandResult
+func RunCommand(cmd []string, timeout int) (result CommandResult) {
+	result.Cmd = cmd
 	if len(cmd) == 0 {
-		result.Err = errors.New("Empty command string present")
-		ch <- result
+		result.Err = errors.New("Empty command string cannot be run")
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
@@ -65,20 +61,17 @@ func RunCommand(cmd []string, timeout int, ch chan CommandResult) {
 	stderr, err := command.StderrPipe()
 	if err != nil {
 		result.Err = err
-		ch <- result
 		return
 	}
 
 	stdout, err := command.StdoutPipe()
 	if err != nil {
 		result.Err = err
-		ch <- result
 		return
 	}
 
 	if err := command.Start(); err != nil {
 		result.Err = err
-		ch <- result
 		return
 	}
 
@@ -88,10 +81,5 @@ func RunCommand(cmd []string, timeout int, ch chan CommandResult) {
 	if err := command.Wait(); err != nil {
 		result.Err = err
 	}
-	log.Debug("Command '", strings.Join(cmd, " "), "' executed (Err: ", result.Err, ", STDOUT: ", result.Stdout, ", STDERR: ", result.Stderr, ")")
-	log.WithFields(log.Fields{
-		"cmd": strings.Join(cmd, " "),
-		"err": result.Err,
-	}).Info("Command finished")
-	ch <- result
+	return
 }

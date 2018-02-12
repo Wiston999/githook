@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -12,7 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Wiston999/githook/event"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -138,11 +138,12 @@ func TestRepoRequestHandler(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		hook := event.Hook{
-			Type:    test.Type,
-			Cmd:     test.Cmd,
-			Path:    "/payloadtest",
-			Timeout: 10,
+		hook := Hook{
+			Type:        test.Type,
+			Cmd:         test.Cmd,
+			Path:        "/payloadtest",
+			Timeout:     10,
+			Concurrency: 1,
 		}
 
 		req, err := http.NewRequest("POST", test.Query, test.Payload)
@@ -151,12 +152,15 @@ func TestRepoRequestHandler(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cmdLog := NewMemoryCommandLog()
+		cmdLog := NewMemoryCommandLog(100)
+		workerChannel := make(chan CommandJob, 100)
+		go CommandWorker("TestRepoRequestHandler", workerChannel, cmdLog)
 
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(RepoRequestHandler(cmdLog, "test", hook))
+		handler := http.HandlerFunc(RepoRequestHandler(cmdLog, workerChannel, "test", hook))
 
-		handler.ServeHTTP(rr, req)
+		ctx := context.WithValue(req.Context(), "requestID", "my-request-id")
+		handler.ServeHTTP(rr, req.WithContext(ctx))
 
 		var jsonBody Response
 		err = json.Unmarshal([]byte(rr.Body.String()), &jsonBody)
@@ -165,8 +169,18 @@ func TestRepoRequestHandler(t *testing.T) {
 		}
 
 		if test.Sync {
-			if !strings.Contains(jsonBody.Msg, "with result") {
-				t.Errorf("%02d. Msg field in response should contain with result string when sync execution, got %s", i, jsonBody.Msg)
+			if _, isString := jsonBody.Body.(string); isString {
+				t.Errorf("%02d. Body field in response when sync execution should be an struct with command result, got %s", i, jsonBody.Body)
+			}
+			bodyMap := jsonBody.Body.(map[string]interface{})
+			if _, found := bodyMap["cmd"]; !found {
+				t.Errorf("%02d. Body should contain the key 'cmd' when sync execution", i)
+			}
+			if _, found := bodyMap["stdout"]; !found {
+				t.Errorf("%02d. Body should contain the key 'stdout' when sync execution", i)
+			}
+			if _, found := bodyMap["stderr"]; !found {
+				t.Errorf("%02d. Body should contain the key 'stderr' when sync execution", i)
 			}
 		}
 
@@ -213,6 +227,7 @@ func TestCommandLogRESTHandler(t *testing.T) {
 		{"admin/log", logResults, false},
 		{"admin/log?count=1", 1, false},
 		{"admin/log?count=-1", logResults, false},
+		{"admin/log?count=invalidnumber", 0, true},
 	}
 
 	for i, test := range testCases {
@@ -222,7 +237,7 @@ func TestCommandLogRESTHandler(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cmdLog := NewMemoryCommandLog()
+		cmdLog := NewMemoryCommandLog(100)
 
 		for i := 0; i < logResults; i = i + 1 {
 			cmdResult := CommandResult{Stdout: []byte(strconv.Itoa(i)), Stderr: []byte(strconv.Itoa(i))}
@@ -251,8 +266,10 @@ func TestCommandLogRESTHandler(t *testing.T) {
 				i,
 				status, http.StatusOK)
 		}
-		if jsonBody.Status != 200 {
+		if !test.Err && jsonBody.Status != 200 {
 			t.Errorf("%02d. Status field in response should have 200, got %v", i, jsonBody.Status)
+		} else if test.Err && jsonBody.Status != 500 {
+			t.Errorf("%02d. Status field in response should have 500, got %v", i, jsonBody.Status)
 		}
 		results := jsonBody.Body.([]interface{})
 		if len(results) != test.Count {

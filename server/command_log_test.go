@@ -14,18 +14,18 @@ func TestAppendResult(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	testRounds := 10
-	memoryCmdLog := NewMemoryCommandLog()
-	diskCmdLog := NewDiskCommandLog(tmpDir)
+	memoryCmdLog := NewMemoryCommandLog(testRounds)
+	diskCmdLog := NewDiskCommandLog(tmpDir, testRounds)
 
 	for i := 0; i < testRounds; i++ {
 		cmdResult := CommandResult{Stdout: []byte(strconv.Itoa(i)), Stderr: []byte(strconv.Itoa(i))}
-		success, err := memoryCmdLog.AppendResult(cmdResult)
-		if success != true || err != nil {
-			t.Errorf("[MemoryCommandLog] AppendResult should not fail, got success == %v and err == %v", success, err)
+		deleted, err := memoryCmdLog.AppendResult(cmdResult)
+		if deleted != 0 || err != nil {
+			t.Errorf("[MemoryCommandLog] AppendResult should not fail, got success == %v and err == %v", deleted, err)
 		}
-		success, err = diskCmdLog.AppendResult(cmdResult)
-		if success != true || err != nil {
-			t.Errorf("[DiskCommandLog] AppendResult should not fail, got success == %v and err == %v", success, err)
+		deleted, err = diskCmdLog.AppendResult(cmdResult)
+		if deleted != 0 || err != nil {
+			t.Errorf("[DiskCommandLog] AppendResult should not fail, got success == %v and err == %v", deleted, err)
 		}
 	}
 
@@ -38,6 +38,30 @@ func TestAppendResult(t *testing.T) {
 		t.Errorf("[DiskCommandLog] After %d AppendResult, log should contain 10 entries, got %d", testRounds, len(memoryCmdLog.CommandLog))
 	}
 
+	for i := 0; i < testRounds; i++ {
+		cmdResult := CommandResult{Stdout: []byte(strconv.Itoa(i)), Stderr: []byte(strconv.Itoa(i))}
+		deleted, err := memoryCmdLog.AppendResult(cmdResult)
+		if deleted != 1 || err != nil {
+			t.Errorf("[MemoryCommandLog] AppendResult should rotate element when 'full', deleted: %d", deleted)
+		}
+		deleted, err = diskCmdLog.AppendResult(cmdResult)
+		if deleted != 1 || err != nil {
+			t.Errorf("[DiskCommandLog] AppendResult should rotate element when 'full', deleted: %d", deleted)
+		}
+	}
+	memoryCmdLog.MaxCommands = 0
+	diskCmdLog.MaxCommands = 0
+	for i := 0; i < testRounds; i++ {
+		cmdResult := CommandResult{Stdout: []byte(strconv.Itoa(i)), Stderr: []byte(strconv.Itoa(i))}
+		deleted, err := memoryCmdLog.AppendResult(cmdResult)
+		if deleted != 0 || err != nil {
+			t.Errorf("[MemoryCommandLog] AppendResult should not rotate element when 'MaxCommands == 0', deleted: %d", deleted)
+		}
+		deleted, err = diskCmdLog.AppendResult(cmdResult)
+		if deleted != 0 || err != nil {
+			t.Errorf("[DiskCommandLog] AppendResult should not rotate element when 'MaxCommands == 0', delted: %d", deleted)
+		}
+	}
 }
 
 func TestGetResults(t *testing.T) {
@@ -45,18 +69,18 @@ func TestGetResults(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	testRounds := 10
-	memoryCmdLog := NewMemoryCommandLog()
-	diskCmdLog := NewDiskCommandLog(tmpDir)
+	memoryCmdLog := NewMemoryCommandLog(100)
+	diskCmdLog := NewDiskCommandLog(tmpDir, 100)
 
 	for i := 0; i < testRounds; i++ {
 		cmdResult := CommandResult{Stdout: []byte(strconv.Itoa(i)), Stderr: []byte(strconv.Itoa(i))}
-		success, err := memoryCmdLog.AppendResult(cmdResult)
-		if success != true || err != nil {
-			t.Errorf("[MemoryCommandLog] AppendResult should not fail, got success == %v and err == %v", success, err)
+		_, err := memoryCmdLog.AppendResult(cmdResult)
+		if err != nil {
+			t.Errorf("[MemoryCommandLog] AppendResult should not fail, got err == %v", err)
 		}
-		success, err = diskCmdLog.AppendResult(cmdResult)
-		if success != true || err != nil {
-			t.Errorf("[DiskCommandLog] AppendResult should not fail, got success == %v and err == %v", success, err)
+		_, err = diskCmdLog.AppendResult(cmdResult)
+		if err != nil {
+			t.Errorf("[DiskCommandLog] AppendResult should not fail, got err == %v", err)
 		}
 	}
 
@@ -134,8 +158,12 @@ func TestRotateResults(t *testing.T) {
 		err              bool
 	}{{
 		rotate:   -1,
-		expected: testRounds,
+		expected: -1,
 		err:      true,
+	}, {
+		rotate:   0,
+		expected: testRounds,
+		err:      false,
 	}, {
 		rotate:   8,
 		expected: testRounds - 8,
@@ -152,54 +180,58 @@ func TestRotateResults(t *testing.T) {
 		rotate:   5,
 		expected: testRounds - 5,
 		err:      false,
+	}, {
+		rotate:   testRounds,
+		expected: 0,
+		err:      false,
 	}}
 
 	for j, tCase := range testCases {
 		tmpDir, _ := ioutil.TempDir("", "")
-		memoryCmdLog := NewMemoryCommandLog()
-		diskCmdLog := NewDiskCommandLog(tmpDir)
+		memoryCmdLog := NewMemoryCommandLog(1000)
+		diskCmdLog := NewDiskCommandLog(tmpDir, 1000)
 
 		for i := 0; i < testRounds; i++ {
 			cmdResult := CommandResult{Stdout: []byte(strconv.Itoa(i)), Stderr: []byte(strconv.Itoa(i))}
-			success, err := memoryCmdLog.AppendResult(cmdResult)
-			if success != true || err != nil {
-				t.Errorf("#%02d. [MemoryCommandLog] AppendResult should not fail, got success == %v and err == %v", j, success, err)
+			_, err := memoryCmdLog.AppendResult(cmdResult)
+			if err != nil {
+				t.Errorf("#%02d. [MemoryCommandLog] AppendResult should not fail, got err == %v", j, err)
 			}
-			success, err = diskCmdLog.AppendResult(cmdResult)
-			if success != true || err != nil {
-				t.Errorf("#%02d. [DiskCommandLog] AppendResult should not fail, got success == %v and err == %v", j, success, err)
+			_, err = diskCmdLog.AppendResult(cmdResult)
+			if err != nil {
+				t.Errorf("#%02d. [DiskCommandLog] AppendResult should not fail, got err == %v", j, err)
 			}
 		}
 
-		rotateReturn, err := memoryCmdLog.RotateResults(tCase.rotate)
+		memoryCmdLog.MaxCommands = tCase.rotate
+		rotateReturn, err := memoryCmdLog.RotateResults()
 		if tCase.err && err == nil {
 			t.Errorf("Expected error but not returned")
 		} else if !tCase.err && err != nil {
 			t.Errorf("Unable to rotate memoryCmdLog: %v", err)
-		} else {
+		} else if !tCase.err {
 
 			memoryElements, err := memoryCmdLog.GetResults(-1)
 
 			if err != nil {
 				t.Errorf("Unable to get memoryCmdLog: %v", err)
 			}
-
-			if rotateReturn != tCase.rotate {
+			if rotateReturn != tCase.expected {
 				t.Errorf(
 					"#%02d. [MemoryCommandLog] Expected rotate returned with %d parameter to be %d, got %d",
 					j,
 					tCase.rotate,
-					tCase.rotate,
+					tCase.expected,
 					rotateReturn,
 				)
 			}
 
-			if len(memoryElements) != tCase.expected {
+			if len(memoryElements) != tCase.rotate {
 				t.Errorf(
 					"#%02d. [MemoryCommandLog] Expected length returned with %d parameter to be %d, got %d",
 					j,
 					tCase.rotate,
-					tCase.expected,
+					tCase.rotate,
 					len(memoryElements),
 				)
 			}
@@ -215,34 +247,35 @@ func TestRotateResults(t *testing.T) {
 			}
 		}
 
-		rotateReturn, err = diskCmdLog.RotateResults(tCase.rotate)
+		diskCmdLog.MaxCommands = tCase.rotate
+		rotateReturn, err = diskCmdLog.RotateResults()
 		if tCase.err && err == nil {
 			t.Errorf("Expected error but not returned")
 		} else if !tCase.err && err != nil {
 			t.Errorf("Unable to rotate diskCmdLog: %v", err)
-		} else {
+		} else if !tCase.err {
 
 			diskFiles, err := diskCmdLog.GetResults(-1)
 			if err != nil {
 				t.Errorf("Unable to get diskCmdLog: %v", err)
 			}
 
-			if rotateReturn != tCase.rotate {
+			if rotateReturn != tCase.expected {
 				t.Errorf(
 					"#%02d. [DiskCommandLog] Expected rotate returned with %d parameter to be %d, got %d",
 					j,
 					tCase.rotate,
-					tCase.rotate,
+					tCase.expected,
 					rotateReturn,
 				)
 			}
 
-			if len(diskFiles) != tCase.expected {
+			if len(diskFiles) != tCase.rotate {
 				t.Errorf(
 					"#%02d. [DiskCommandLog] Expected lenght returned with %d parameter to be %d, got %d",
 					j,
 					tCase.rotate,
-					tCase.expected,
+					tCase.rotate,
 					len(diskFiles),
 				)
 			}
@@ -266,18 +299,18 @@ func TestCount(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	testRounds := 10
-	memoryCmdLog := NewMemoryCommandLog()
-	diskCmdLog := NewDiskCommandLog(tmpDir)
+	memoryCmdLog := NewMemoryCommandLog(100)
+	diskCmdLog := NewDiskCommandLog(tmpDir, 100)
 
 	for i := 0; i < testRounds; i++ {
 		cmdResult := CommandResult{Stdout: []byte(strconv.Itoa(i)), Stderr: []byte(strconv.Itoa(i))}
-		success, err := memoryCmdLog.AppendResult(cmdResult)
-		if success != true || err != nil {
-			t.Errorf("[MemoryCommandLog] AppendResult should not fail, got success == %v and err == %v", success, err)
+		_, err := memoryCmdLog.AppendResult(cmdResult)
+		if err != nil {
+			t.Errorf("[MemoryCommandLog] AppendResult should not fail, got err == %v", err)
 		}
-		success, err = diskCmdLog.AppendResult(cmdResult)
-		if success != true || err != nil {
-			t.Errorf("[DiskCommandLog] AppendResult should not fail, got success == %v and err == %v", success, err)
+		_, err = diskCmdLog.AppendResult(cmdResult)
+		if err != nil {
+			t.Errorf("[DiskCommandLog] AppendResult should not fail, got err == %v", err)
 		}
 	}
 
