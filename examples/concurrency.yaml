@@ -1,0 +1,20 @@
+---
+  hooks:
+    sleep1:
+      type: bitbucket
+      path: /sleep1
+      timeout: 600
+      cmd: [sleep, 1]
+    sleep10:
+      type: bitbucket
+      path: /sleep10
+      timeout: 600
+      concurrency: 5
+      cmd: [sleep, 10]
+    'false':
+      type: bitbucket
+      path: '/false'
+      timeout: 10
+      cmd:
+        - '/bin/false'
+

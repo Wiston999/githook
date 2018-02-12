@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -18,11 +19,23 @@ import (
 func JSONRequestMiddleware(h http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID, _ := uuid.NewV4()
-		log.WithFields(log.Fields{"reqId": requestID, "url": r.URL.Path, "method": r.Method}).Info("Received request")
-		defer log.WithFields(log.Fields{"reqId": requestID}).Info("Request completed")
+		requestIDStr := requestID.String()
+		log.WithFields(log.Fields{
+			"reqId":  requestID,
+			"url":    r.URL.Path,
+			"method": r.Method,
+			"remote": r.RemoteAddr,
+		}).Info("Received request")
+		defer log.WithFields(log.Fields{
+			"reqId":  requestID,
+			"url":    r.URL.Path,
+			"method": r.Method,
+			"remote": r.RemoteAddr,
+		}).Info("Request completed")
 
 		w.Header().Set("Content-Type", "application/json")
-		h.ServeHTTP(w, r)
+		ctx := context.WithValue(r.Context(), "requestID", requestIDStr)
+		h.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -62,11 +75,12 @@ func CommandLogRESTHandler(cmdLog CommandLog) func(http.ResponseWriter, *http.Re
 	}
 }
 
-// RepoRequestHandler setups an http.HandlerFunc using event.Hook information
+// RepoRequestHandler setups an http.HandlerFunc using Hook information
 // This function makes the hard work of setting up a listener hook on the HTTP Server
-// based on an event.Hook structure
-func RepoRequestHandler(cmdLog CommandLog, hookName string, hookInfo event.Hook) func(http.ResponseWriter, *http.Request) {
+// based on an Hook structure
+func RepoRequestHandler(cmdLog CommandLog, workerChannel chan CommandJob, hookName string, hookInfo Hook) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		requestID := r.Context().Value("requestID").(string)
 		repoEvent := &event.RepoEvent{}
 		var response Response
 		var err error
@@ -120,28 +134,22 @@ func RepoRequestHandler(cmdLog CommandLog, hookName string, hookInfo event.Hook)
 			return
 		}
 
-		channel := make(chan CommandResult)
-		go RunCommand(cmd, hookInfo.Timeout, channel)
+		cmdJob := CommandJob{Cmd: cmd, ID: requestID, Timeout: hookInfo.Timeout}
 		if sync {
-			result := <-channel
-			cmdLog.AppendResult(result)
-			response.Status = 200
-			response.Msg = fmt.Sprintf(
-				"Command '%s' sent to execute with result {Err: '%v', stdout: '%s', stderr: '%s'}",
-				strings.Join(cmd, " "),
-				result.Err,
-				result.Stdout,
-				result.Stderr,
-			)
-			json.NewEncoder(w).Encode(response)
-
-		} else {
-			go func() {
-				result := <-channel
-				cmdLog.AppendResult(result)
-			}()
-			response.Status, response.Msg = 200, fmt.Sprintf("Command '%s' sent to execute", strings.Join(cmd, " "))
-			json.NewEncoder(w).Encode(response)
+			cmdJob.Response = make(chan CommandResult, 1)
 		}
+		workerChannel <- cmdJob
+		response.Status, response.Msg, response.Body = 200, "Command sent to execute", strings.Join(cmd, " ")
+		if sync {
+			log.WithFields(log.Fields{
+				"cmd":       cmdJob.Cmd,
+				"queue_len": len(workerChannel),
+				"reqId":     requestID,
+			}).Info("Waiting for command to complete before returning")
+
+			result := <-cmdJob.Response
+			response.Body = result
+		}
+		json.NewEncoder(w).Encode(response)
 	}
 }
