@@ -1,0 +1,19 @@
+---
+listeners:
+  sleep:
+    input:
+      seconds:
+        type: body
+        decoding:
+        - base64decode
+        - jsondecode
+        selector: 'values.0.sleep'
+    filters:
+      and:
+      - 'seconds <= 10'
+hooks:
+  sleep:
+    type: sleep
+    path: /sleep
+    timeout: 10
+    cmd: [sleep, '{{ .Seconds }}']
